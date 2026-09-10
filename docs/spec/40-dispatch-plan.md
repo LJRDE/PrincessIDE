@@ -123,11 +123,14 @@ cd /root/PrincessIDE && DSH_PERMISSION_MODE=danger-full-access \
 
 **冲突规则**：三路都依赖 core 类型但**都不得修改 core**。若发现 core 类型不够用，写进交接摘要由主 Agent 裁决，不要各自去改。
 
-**派发节奏（2026-09-11 依实测资源状况裁决）**：**不要三路同时开跑编译**。
-- 实测背景：本机 4 核 / 无 swap；并行期出现过「可用内存 710Mi、3.1Gi 已用」的紧张状态，同时在跑的有 P3-A 的 Tauri `cargo build`、调研 D 的 `cargo build --release`、以及 QEMU 实例。OOM 计数为 0、PSI 低，属于「紧但可控」。
-- 两个硬理由：① **三路同属一个 Cargo 工作区**，并发 `cargo build` 会在 `target/` 锁上相互阻塞，反而更容易撞工具的超时；② 每个 rustc 进程峰值内存不小，叠加有 OOM 风险，而 **OOM 会静默杀掉别人的构建**，制造「莫名其妙的失败」。
-- **裁决**：**先派 B1（`princess-build`）单独跑完并冻结**，再并行派 B2（`run`）+ B3（`symbol`）。宁可慢，也不要让三路互相踩。若届时内存充裕（可用 > 1.5G），可放宽为三路并行。
-- 所有 Agent 一律 `CARGO_BUILD_JOBS=2` 上限；若出现构建莫名失败，降到 1 重试并如实标注。
+**派发节奏（2026-09-11 依实测资源状况裁决，并由 D21 收紧）**：**重活必须串行**。
+- **实测背景（已付出代价）**：本机 4 核 / 无 swap。自主期发生 **2 次全局 OOM 杀进程**（`dmesg` 可见 `global_oom`，被杀进程 anon-rss ≈ 1.05 GB）。**后果**：P2-B1（`princess-build`）刚派出即被打断、**零产出**；调研 C 第一棒 Agent 被杀且**会话变为不可用**。根因是内存中非项目进程已占约 1.7G（`dsh web` / `hermes dashboard` / `claude`），留给项目的仅约 2G。
+- **裁决（硬规则，见 D21）**：
+  1. **同一时间只允许一路重型构建**；派发前先 `free -h`，**可用 < 1.2G 不得启动新重活**。
+  2. 重型构建一律 **`CARGO_BUILD_JOBS=1`**；`make` 上限 `-j2`。
+  3. **不同时派两个需要编译的 Agent**：**先 B1 单独跑完并冻结**，再串行 B2（`run`）→ B3（`symbol`）。宁可慢，也不要第三次 OOM。
+  4. 构建莫名失败时**先查 `dmesg | grep -i oom-kill`**，再怀疑代码。
+  5. 附加理由：三路同属一个 Cargo 工作区，并发 `cargo build` 会在 `target/` 锁上互相阻塞，反而更容易撞工具超时。
 
 ---
 
@@ -140,7 +143,7 @@ cd /root/PrincessIDE && DSH_PERMISSION_MODE=danger-full-access \
 
 ## 五、后续阶段 outline
 
-- **P4 调试器**：先落定 D11（内置 `gdb -i=dap`  vs 自写 MI→DAP 适配层）；再做无头断点 E2E（P4-1~P4-4），必须含**架构自检**（D10 的 gdbstub 错配问题）。
+- **P4 调试器**：**D11 已落定**——主干用 **GDB 内置 DAP**（工作区自带 gdb 13.1 **没有** DAP，必须 **gdb ≥14**，当前可用 16.3），**只需在 Rust 侧补一层薄能力层**（硬件断点 `hbreak`、物理内存读写、寄存器面板、REPL 逃生舱），**不要自写完整 MI→DAP 转换**。做无头断点 E2E（P4-1~P4-4），必须含**架构自检**（D10 的 gdbstub 错配问题）。**调试目标建议直接用 `fixtures/paging-kernel/`**——调研 C 已实测 DAP 对它可给出完整源码级回溯（`paging_fault_probe` → `kernel_main` → `_start`），验收形态已被证明可达。**注意**：调研 C 第一棒的产物文件含**假阴性**，以第二棒报告为准。
 - **P5 可视化**：按调研 D 结论选定 crate；ELF/反汇编做 **golden 文件比对**（对 `readelf`/`objdump`）；monitor 相关一律用**录制样本**做夹具，不依赖实时 QEMU。
 - **P6 模板与向导**：模板生成 → 构建 → 启动 → 横幅断言；工具链检测要给**可执行的修复建议**。
 - **P7 AI**：provider 抽象用本地 mock 做单测；真实调用默认跳过（需显式环境变量）；AI 不可用不得影响主流程。

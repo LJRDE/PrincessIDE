@@ -62,9 +62,15 @@
 - **已知坑**：32 位内核配 `qemu-system-x86_64` 的 gdbstub 会出现 `Remote 'g' packet reply is too long` 与回溯乱码。
 - **影响**：P4 的调试后端必须做**架构自检**并在错配时给出明确错误，而不是返回乱数据。 **[实测]**
 
-## D11 调试协议路线：**暂缓，等调研 C 结论**
-- **现状**：初定「Rust 侧自写 DAP 适配层包装 GDB/MI」。调研 C 正在核实 GDB 14+ 自带的 `gdb -i=dap` 能否直接用（若能，可省掉整层适配）。
-- **决策规则（预先定好，避免返工）**：若 `gdb -i=dap` [实测] 可用且能力覆盖 P4 验收项 → **直接用内置 DAP**；否则自写 MI→DAP 适配层。 **[裁决]**
+## D11 调试协议路线：**已落定 —— 用 GDB 内置 DAP + 一层薄能力层**
+- **原设想（已被推翻）**：「Rust 侧自写完整 DAP 适配层包装 GDB/MI」。调研 C 实测证明这是**不必要的重活**。
+- **裁决（[实测] 支撑）**：
+  1. **主干直接用 GDB 内置 DAP**：`gdb -i=dap` 在 **gdb 16.3** 上实测可用，`initialize` 返回真实能力集（`supportsReadMemoryRequest` / `supportsWriteMemoryRequest` / `supportsDisassembleRequest` / `supportsSteppingGranularity` 等）。**前端只对接标准 DAP，不碰 MI**。
+  2. **但必须补一层薄的"能力补齐"层（不是全量转换）**，因为实测发现内置 DAP **没有硬件断点**：`_set_one_breakpoint` 只构造 `gdb.Breakpoint`，`info breakpoints` 显示 `Type breakpoint` 而非 `hw breakpoint`——**而内核入口断点必须用 `hbreak`**。还需补：物理内存读写、寄存器面板、以及一个 REPL 逃生舱（monitor/QMP 交互）。
+  3. **版本硬要求**：工作区自带的 **gdb 13.1 实测 `Interpreter 'dap' unrecognized`（没有 DAP）**，P4 必须用 **gdb ≥14**（当前可用的是调研 C 解包的 **16.3**）。
+- **能力已提前验证**：对 `fixtures/paging-kernel/` 的真实 DAP `stackTrace` 拿到了**完整源码级回溯**（`paging_fault_probe` @kernel.c:120 → `kernel_main` @157 → `_start` @194）——即 **P4-3 的验收形态在 P4 开工前就已被证明可达**。
+- **⚠️ 重要勘误**：调研 C 第一棒留下的 `kernel_test.out` 里有**多处假阴性**（把 `monitor` 报成"not supported"、`pause` 超时、`stackTrace` 崩溃），第二棒复现后确认**那些都是脚本把会话推进坏状态所致，干净会话下全部可用**。**P4 不要采信第一棒的产物文件，以第二棒的报告为准。**
+- 依据：`docs/research/C-debug-protocol.md`（523 行，含独立「反例与风险」「未实测」两节；未实测项：SMP 多核、LLDB/CodeLLDB、cppdbg、LA57）。 **[实测]**
 
 ## D12 模型路由：~~只用 DeepSeek Flash，Mimo 弃用~~ → **已推翻，见 D12'**
 - ~~原决策：一律 `deepseek-official/deepseek-v4-flash`，禁用 `deepseek-v4-pro`，Mimo 通道弃用。~~
@@ -153,15 +159,29 @@
 - 依据：`docs/research/D-binary-lowlevel-tooling.md` §1（逐项结论 + 版本 + 许可证 + 风险）
 - **影响**：B3（`princess-symbol`）与 P5（可视化）一律按此栈实现，不要另起选型。
 
+## D21 并发上限收紧（实测 OOM 两次，必须串行化重活）
+- **事件**：自主期发生 **2 次全局 OOM 杀进程**（dmesg: `oom-kill:constraint=CONSTRAINT_NONE,...global_oom`，被杀进程 `anon-rss ≈ 1.05 GB`）。
+- **实际损失**：P2-B1（`princess-build`）**刚派出就被打断、一个文件都没产出**；调研 C 的工作进程也被杀且**其 Agent 已变为不可用（无法唤醒），报告至今缺失**。
+- **根因**：3.8G 内存中**非项目进程已占约 1.7G**（`dsh web` ≈1G、`hermes dashboard` ≈490M、`claude` ≈220M），留给项目的仅约 2G；而**单个 rustc 编译大型依赖树可占数百 MB**，多路并发必然 OOM。
+- **裁决（硬规则，收紧 D16）**：
+  1. **同一时间只允许一路重型构建**（Rust 依赖树编译 / Tauri build / 批量 QEMU）。派发前先 `free -h`：**可用 < 1.2G 时不得启动新的重活**。
+  2. 重型构建一律 **`CARGO_BUILD_JOBS=1`**（不再是 2）；`make` 上限 `-j2`。
+  3. **不要同时派两个需要编译的 Agent**——宁可串行慢，也不要第三次 OOM。
+  4. 构建「莫名其妙失败」时，**先查 `dmesg | grep -i oom-kill`**，再怀疑代码。
+- **禁止**为此去杀用户的非项目进程（`hermes dashboard`、`claude` 等）——那是越界，不属于项目编排权限。 **[实测]**
+
 ---
 
 ## 开放待办（Open Actions）
 
 | # | 事项 | 归属 | 阻塞谁 |
 |---|---|---|---|
-| A1 | 扩展 bootstrap 增装 **clangd-16**（见 D6） | 待派 | P3 语言服务、P2 诊断解析 |
-| A2 | 调研 C 出结论后落定 D11（自写适配层 vs 内置 DAP） | 进行中 | P4 全部 |
-| A3 | 清理废弃草稿（`_work/`、`_toolchain/`、`.researchA/`）——**等调研 C/D 用完 `.researchC/.researchD` 后再删** | 主 Agent | 无（已 gitignore） |
-| A4 | 主编排：P2-B（`princess-build`/`run`/`symbol`）派发，依赖 P2-A 的 `princess-core` 类型 | 主 Agent | P2 验收 |
-| A5 | 编辑器组件最终选型复核（P3 Agent 自决，主 Agent 复核） | P3 进行中 | P3 验收 |
-| A6 | **是否开启 `subagent-model-selection`**：开启后我才能「后台派发 + 指定 Mimo 模型」；不开启则路由 Mimo 只能用前台阻塞的 `workflow`（见 D12'） | **待用户决定** | 我的派发方式与效率 |
+| A1 | 扩展 bootstrap 增装 **clangd-16** | ✅ 完成 | — |
+| A2 | **调研 C 重派**（原 Agent 因 OOM 不可用、无报告）：落定 D11（内置 `gdb -i=dap` vs 自写 MI 适配层） | 主 Agent（Mimo） | **P4 全部** |
+| A3 | 清理废弃草稿（`_work/`、`_toolchain/`、`.researchA/`） | 主 Agent | 无（已 gitignore） |
+| A4 | **P2-B1 重派**（被 OOM 打断、零产出）；随后按 D21 串行派 B2/B3 | 主 Agent | P2 验收 |
+| A5 | 编辑器组件选型复核（P3 已交付，主 Agent 复核） | 主 Agent | P3 收尾 |
+| A6 | ~~开启 `subagent-model-selection`~~ **已不需要**：改用 `dsh --profile headless` 直接路由 Mimo，不占用用户会话 | ✅ 解决 | — |
+| A7 | P2-A 收尾：`princess-cli` 实现 + 事件夹具 + P2-6/P2-7 负样本 | P2-A（已唤醒） | P2-C 集成 |
+| A8 | 按 **D21** 复查所有派发命令：重活 `CARGO_BUILD_JOBS=1`、派发前查 `free -h` | 主 Agent | 全部 |
+| A9 | **把 gdb ≥14 提升为一线工具链**：现在它只存在于 `.researchC/dapbin/rootfs` 这个**临时草稿目录**里。需扩展 `scripts/bootstrap-toolchain.sh` 装到 `.toolchain/`、`env.sh` 导出（如 `PRINCESSIDE_DEBUG_GDB`）、`doctor.sh` 断言版本 ≥14。**不完成则 P4 依赖草稿目录，随时可能被清理** | 待派（Mimo） | **P4 全部** |
