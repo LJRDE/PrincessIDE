@@ -1,0 +1,49 @@
+# PrincessIDE workspace cargo configuration.
+#
+# Deliberately minimal.  RUSTUP_HOME / CARGO_HOME are redirected into
+# .toolchain/ by scripts/env.sh; nothing here may depend on ~/.cargo.
+
+[net]
+retry = 5
+# Some hosts behind flaky links do better letting the git CLI handle fetches.
+git-fetch-with-cli = true
+
+# ---------------------------------------------------------------------------
+# crates.io source replacement — measured on this host, 2026-09-11.
+#
+# This machine has very poor international bandwidth.  Evidence:
+#   * static.crates.io served 0–35 KB/s and could NOT finish a 790 KB crate
+#     within 15 s (only 535 KB transferred);
+#   * static.rust-lang.org measured ~62 B/s (hence the rustup mirror already
+#     configured in scripts/bootstrap-toolchain.sh);
+#   * symptom seen in practice: `cargo build` stalls in the dependency-download
+#     phase for 10+ minutes and never even creates target/, with
+#     .toolchain/cargo/registry holding 14 MB of index but ZERO *.crate files.
+#
+# Measured download speed for tokio-1.40.0.crate (790 KB):
+#   USTC      mirrors.ustc.edu.cn            2.1 MB/s   <-- selected
+#   rsproxy   rsproxy.cn                     982 KB/s   (fallback below)
+#   tuna      mirrors.tuna.tsinghua.edu.cn   905 B/s    (its config.json points
+#                                                        "dl" back at the slow
+#                                                        static.crates.io)
+#   official  static.crates.io               35 KB/s    (and truncated)
+# ---------------------------------------------------------------------------
+[source.crates-io]
+replace-with = "ustc"
+
+[source.ustc]
+registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
+
+# Fallback: if USTC degrades, swap the two blocks above for these.
+# [source.crates-io]
+# replace-with = "rsproxy"
+# [source.rsproxy]
+# registry = "sparse+https://rsproxy.cn/index/"
+
+[build]
+# Keep build output inside the workspace (the host also has a system cargo, and
+# a shared $CARGO_TARGET_DIR would silently mix toolchains).
+target-dir = "target"
+
+[term]
+verbose = false

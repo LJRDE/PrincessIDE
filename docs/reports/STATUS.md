@@ -50,6 +50,7 @@
 - **模型路由（D12'）**：子 Agent 默认 **`mimo-v2.5-pro`**（token 不限量）；**只有重难点**（核心引擎、关键架构决策、最终独立验收）用 `deepseek-official/deepseek-v4-flash`；**禁用 `deepseek-v4-pro`**。
 - **后台派发**：Mimo 走 `dsh --profile headless`（后台 bash job，不占用用户会话）；重难点走 `subagent` 工具（可 `send_message` 纠偏 + 自动通知）。
 - **内存纪律（D16）**：4 核 / 无 swap / 可用约 1.1G；编译 `-j2` 上限；**同时最多 2~3 个 headless Agent**；莫名构建失败先怀疑内存。
+- **网络纪律（D19，关键）**：本机国际带宽极差，**crates.io 官方源下不动**（0~35 KB/s）。已在 `.cargo/config.toml` 配置 **USTC 镜像**（2.1 MB/s），实测 `cargo fetch` **10.7 秒下完 31 个包**（修复前 10 分钟 0 个）。遇到「cargo 构建很久没动静」先看 registry 里 `.crate` 是否在增长，别误判成代码问题。
 - **QEMU 纪律**：必须 `timeout` 包裹 + **按进程组收尾**，禁止留孤儿（孤儿会污染 P2-7 的「无孤儿进程」断言）。
 
 ---

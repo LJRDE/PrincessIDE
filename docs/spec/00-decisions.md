@@ -136,6 +136,14 @@
 - **生成 `compile_commands.json` 前必须先 `make clean`**：实测第二次 bear 会用空数组 `[]` **覆盖**已有条目（这是很难察觉的数据损坏）。
 - 不带版本号的 `clang` 同样是 14；LLVM 16 一律走带版本号的名字（`clang-16`、`clangd-16`）。 **[实测]**
 
+## D19 crates.io 必须走国内镜像（否则所有 Rust 构建慢性瘫痪）
+- **背景（实测）**：本机国际带宽极差。官方 `static.crates.io` 下载 **0~35 KB/s**，790KB 的包 15 秒都传不完（只传了 535KB 就被截断）；`static.rust-lang.org` 仅 ~62 B/s。
+- **症状**：`cargo build` 卡在**依赖下载**阶段 10 分钟以上，连 `target/` 目录都没生成；`.toolchain/cargo/registry` 有 14M 索引缓存但 **`.crate` 文件数为 0**。**极易被误判成"代码编译不过"或"卡死"。**
+- **决策**：工作区 `.cargo/config.toml` 配置 `[source.crates-io] replace-with = "ustc"`，镜像 `sparse+https://mirrors.ustc.edu.cn/crates.io-index/`；备选 rsproxy（已作为注释保留在文件里）。
+- **实测速度排序**（tokio-1.40.0.crate，790KB）：**USTC 2.1 MB/s** > rsproxy 982 KB/s ≫ 官方 35 KB/s（且截断）> 清华 905 B/s（其 `config.json` 的 `dl` 指回官方慢速源，等于没用）。
+- **修复验证**：`cargo fetch`（serde + serde_json + tokio full features）**10.7 秒**下完 **31 个 crate**，exit 0；修复前 10 分钟 0 个。
+- **纪律**：任何 Agent 遇到「cargo 构建很久没动静」——**先查 registry 里 `.crate` 数量是否在增长**，再怀疑代码；**禁止**回退 `.cargo/config.toml` 的源替换。 **[实测]**
+
 ---
 
 ## 开放待办（Open Actions）
