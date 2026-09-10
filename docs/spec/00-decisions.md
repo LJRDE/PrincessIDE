@@ -182,6 +182,20 @@
   4. 其余不变：构建莫名失败**先查 `dmesg | grep -i oom-kill`**；**仍禁止**杀用户的非项目进程。
 - **注意**：swap **只防 OOM、不提升速度**。若 `vmstat 1` 见到 `si/so` 持续非零（明显换页），应主动降到 1 路构建。
 
+## D23 裁决 P2-A 提出的三项（core 不改、夹具不加 manifest、`exitCode` 可为 null）
+1. **不扩展 `RunExitedPayload` / 不改 `classify_exit` 语义**。**[裁决]**
+   - 理由（采纳 P2-A 的论证并经我复核）：契约 §2 的 `reason` 回答的是「**机器为什么停了**」，四值封闭即可；「**guest 出了什么故障**」已由 `run.fault` **正交**表达。若为「异常后停机」新增枚举值，等于让引擎去**猜 guest 内部状态**，违反契约 §6 规则 4；且此刻有 5 个 Agent 正编译在你冻结的 API 上，**动 core 的代价远大于收益**。
+   - **UI 侧表达方式**：同一 `opId` 内先出现 `run.fault` 再出现 `run.exited{reason:"timeout"}` → 前端渲染成「已发生异常并停机」，无需引擎改动。
+   - `timeout` 归因的**判据**（P2-A 已写入 `docs/reports/p2-core.md`）：QEMU 自身 stderr 有 `terminating on signal 15 from pid … (princess-cli)`，且 `uptimeMs=15064 ≈ timeout_ms=15000` → 是**引擎按期限终止**，而非 guest 自主退出。
+2. **`run.exited.exitCode` 允许 `null`**（信号致死无退出码）—— 已同步进契约 §2。 **[裁决]**
+3. **不给 `fixtures/refkernel/` 加 `princess.toml`**。**[裁决]**
+   - 理由：refkernel 恰好用来覆盖「**无 manifest → 引擎默认配置**」这条路径；而「**显式 manifest**」这条路径已由 `templates/x86_64-multiboot2/princess.toml` 覆盖（P6 已验证，其自检脚本逐字核对 37 个契约字段）。
+   - 因此**两条路径都被测到**，且**不必去动一个已被验证过的夹具**（改动已验证资产要付重新验证的成本）。
+
+## D24 P2 验收的「workspace 全绿」是集成门（当前未达成）
+- **现状**：`cargo test --workspace` **不是绿的**——`princess-bin`(P5) 有 **16 个编译错误**、`princess-build`(P2-B) 曾有 4 个失败测试。P2-A 只能保证 `-p princess-core -p princess-cli` **85/85 全绿**（这部分已达成）。
+- **裁决**：验收文档里 P2-1 的 `cargo test --workspace` 是**集成门**，只有等 B/P5 各路收敛后才可能满足；**在 **P2-C** 阶段由主 Agent 亲自把关**，届时必须全绿才可宣布 P2 完成。在此之前，**不得**把「某 crate 自己绿」表述为「P2 完成」。 **[裁决]**
+
 ---
 
 ## 开放待办（Open Actions）

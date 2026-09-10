@@ -68,7 +68,7 @@
 | `build.finished` | `status`: `ok`\|`failed`\|`cancelled`；`exitCode`；`durationMs`；`artifacts[]` = `{path, kind, size, sha256}`（**`artifacts` 可为空数组**：此时由引擎**发现**构建产物，不得硬编码夹具文件名） |
 | `run.started` | `qemuArgv`、`gdbStub`（可为 null） |
 | `run.fault` | `vector`: `#DE`\|`#UD`\|`#PF`\|…；`rip`: u64（解析后）；**`ripText`**（guest 原始 16 位十六进制文本，**保留原文以便核对，不得只留解析值**）；`errorCode`；`regs`；`symbolicated?` = `{symbol, file, line}` |
-| `run.exited` | `exitCode`；`reason`: `guest-shutdown`\|`triple-fault`\|`timeout`\|`killed`；`uptimeMs` |
+| `run.exited` | `exitCode`（**可为 `null`**：信号致死时没有退出码，**宁可 null 也不编造**）；`reason`: `guest-shutdown`\|`triple-fault`\|`timeout`\|`killed`；`uptimeMs` |
 | `debug.stopped` | `reason`: `breakpoint`\|`step`\|`signal`\|`entry`；`threadId`；`frame`；`regs` |
 | `debug.breakpoint.changed` | `id`、`verified`、`location` |
 | `debug.output` | `category`: `console`\|`stdout`\|`stderr`；`text` |
