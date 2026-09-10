@@ -139,6 +139,10 @@ pub struct MakeBackend {
     /// `build.finished`, but its signature returns only that payload, so the
     /// path is stashed here for [`build_project`] and the CLI to read back.
     last_compile_commands: std::sync::Mutex<Option<PathBuf>>,
+    /// Explicit build parallelism from `[build] jobs`.  `None` — the default —
+    /// means "inject nothing": `make`/`cargo` decide, and whatever the user's
+    /// environment already has is inherited untouched (D25).
+    jobs: Option<u32>,
 }
 
 impl MakeBackend {
@@ -151,6 +155,7 @@ impl MakeBackend {
             artifact_root: PathBuf::from("."),
             timeout_ms: DEFAULT_BUILD_TIMEOUT_MS,
             last_compile_commands: std::sync::Mutex::new(None),
+            jobs: None,
         }
     }
 
@@ -189,7 +194,22 @@ impl MakeBackend {
         let mut backend = Self::new(toolchain);
         backend.artifact_root = project.root.clone();
         backend.timeout_ms = DEFAULT_BUILD_TIMEOUT_MS;
+        // D25: `[build] jobs` is the only thing that may pin parallelism.
+        // The contract field itself lives in `princess_core::config::BuildSection`
+        // (out of this crate's scope), so this cannot read it yet; until it
+        // lands, a project cannot pin jobs and the default (inject nothing)
+        // applies. `with_jobs` is the seam the wiring will use.
         backend
+    }
+
+    /// Pin build parallelism explicitly (the `[build] jobs = N` contract).
+    ///
+    /// `None` (the default) means "inject nothing"; `Some(n)` makes
+    /// `MAKEFLAGS=-jn` and `CARGO_BUILD_JOBS=n` part of the child environment,
+    /// overriding whatever the user's environment had.
+    pub fn with_jobs(mut self, jobs: Option<u32>) -> Self {
+        self.jobs = jobs;
+        self
     }
 
     /// Swap the process runner (tests, and the CLI's dry-run mode).
@@ -203,8 +223,15 @@ impl MakeBackend {
     }
 
     /// The child environment: the workspace launcher dir wins the `PATH` race so
-    /// `bear`, `nasm`, `qemu` resolve to the pinned versions (D18/D19), and the
-    /// build is forced to one job (D21: this host has no swap).
+    /// `bear`, `nasm`, `qemu` resolve to the pinned versions (D18/D19).
+    ///
+    /// Parallelism is **only** pinned when the project explicitly asked for it
+    /// (`[build] jobs = N`, D25).  By default this injects nothing: `make` and
+    /// `cargo` decide for themselves, and any `MAKEFLAGS`/`CARGO_BUILD_JOBS` the
+    /// user already exported is inherited untouched.  The runner applies this
+    /// map additively on top of the parent environment, so *omitting* a key is
+    /// exactly what preserves the user's value.  (D21's single-job rule was a
+    /// property of our development sandbox, not of the IDE's product behaviour.)
     pub fn build_env(&self, project: &ResolvedProject) -> BTreeMap<String, String> {
         let mut env = BTreeMap::new();
         if let Some(bin) = launcher_dir() {
@@ -214,11 +241,11 @@ impl MakeBackend {
                 format!("{}:{existing}", bin.display()),
             );
         }
-        // D21: never let `make` fan out.  `CARGO_BUILD_JOBS` is honoured by the
-        // Rust half of the toolchain; `MAKEFLAGS`/`-j` by make itself.
-        env.insert("CARGO_BUILD_JOBS".to_string(), "1".to_string());
-        if !env.contains_key("MAKEFLAGS") {
-            env.insert("MAKEFLAGS".to_string(), "-j1".to_string());
+        // `[build] jobs`: explicitly configured only.  When present it wins over
+        // any inherited value; when absent neither key is emitted.
+        if let Some(jobs) = self.jobs {
+            env.insert("MAKEFLAGS".to_string(), format!("-j{jobs}"));
+            env.insert("CARGO_BUILD_JOBS".to_string(), jobs.to_string());
         }
         // `[toolchain]` pins, when the project set them.
         if let Some(cc) = &project.config.toolchain.cc {
@@ -1050,8 +1077,64 @@ mod tests {
         // project's default goal.
         assert_eq!(plan.argv.len(), 1);
         assert_eq!(plan.cwd, root);
-        // D21: the child is forced to a single job.
-        assert_eq!(plan.env.get("CARGO_BUILD_JOBS").map(String::as_str), Some("1"));
+        // D25: with no `[build] jobs` the child env carries no parallelism pin.
+        assert!(!plan.env.contains_key("CARGO_BUILD_JOBS"));
+        assert!(!plan.env.contains_key("MAKEFLAGS"));
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn default_jobs_injects_nothing_and_preserves_the_user_environment() {
+        // A user who exported their own parallelism must keep it.  The child
+        // environment is applied additively over the parent (`process.rs` uses
+        // `Command::env`), so *not* emitting a key is what preserves it — and
+        // this backend must never overwrite it with a dev-box default.
+        let saved_makeflags = std::env::var("MAKEFLAGS").ok();
+        let saved_cargo_jobs = std::env::var("CARGO_BUILD_JOBS").ok();
+        std::env::set_var("MAKEFLAGS", "-j7");
+        std::env::set_var("CARGO_BUILD_JOBS", "7");
+
+        let (root, project) = temp_project("default-jobs");
+        let backend = MakeBackend::for_project(&project);
+        let env = backend.build_env(&project);
+
+        // Nothing is injected, so the inherited values survive untouched.
+        assert_eq!(env.get("MAKEFLAGS"), None);
+        assert_eq!(env.get("CARGO_BUILD_JOBS"), None);
+
+        match saved_makeflags {
+            Some(v) => std::env::set_var("MAKEFLAGS", v),
+            None => std::env::remove_var("MAKEFLAGS"),
+        }
+        match saved_cargo_jobs {
+            Some(v) => std::env::set_var("CARGO_BUILD_JOBS", v),
+            None => std::env::remove_var("CARGO_BUILD_JOBS"),
+        }
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn configured_jobs_are_injected_verbatim() {
+        let (root, project) = temp_project("configured-jobs");
+        let backend = MakeBackend::for_project(&project).with_jobs(Some(2));
+        let env = backend.build_env(&project);
+        assert_eq!(env.get("MAKEFLAGS").map(String::as_str), Some("-j2"));
+        assert_eq!(env.get("CARGO_BUILD_JOBS").map(String::as_str), Some("2"));
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn unconfigured_jobs_adds_no_keys_at_all() {
+        let (root, project) = temp_project("no-jobs");
+        let backend = MakeBackend::for_project(&project);
+        let env = backend.build_env(&project);
+        // The only key a default project may add is the D18 PATH launcher;
+        // no parallelism knob is invented.
+        for key in env.keys() {
+            assert_eq!(key, "PATH", "unexpected injected key: {key}");
+        }
+        assert!(!env.contains_key("MAKEFLAGS"));
+        assert!(!env.contains_key("CARGO_BUILD_JOBS"));
         std::fs::remove_dir_all(&root).unwrap();
     }
 

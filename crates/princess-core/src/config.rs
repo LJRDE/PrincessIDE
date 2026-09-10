@@ -249,6 +249,12 @@ pub struct BuildSection {
         skip_serializing_if = "Option::is_none"
     )]
     pub compile_commands: Option<PathBuf>,
+    /// Build parallelism.  When `None`, the engine injects **nothing** and lets
+    /// make/cargo decide; when set, the engine injects `MAKEFLAGS=-jN` and
+    /// `CARGO_BUILD_JOBS=N`.  (D25: dev-box memory discipline must not leak
+    /// into product behaviour.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jobs: Option<u32>,
 }
 
 fn default_dot() -> PathBuf {
@@ -269,6 +275,7 @@ impl Default for BuildSection {
             targets: Vec::new(),
             artifacts: Vec::new(),
             compile_commands: Some(PathBuf::from("compile_commands.json")),
+            jobs: None,
         }
     }
 }

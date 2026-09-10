@@ -1,0 +1,33 @@
+[package]
+name = "princess-symbol"
+description = "PrincessIDE symbol engine (P2-B3): ELF/DWARF parsing, address->source symbolication, demangling and stack-trace recovery. Frozen stack per D20: object 0.40 + gimli 0.34 + addr2line 0.27 + rustc-demangle/cpp_demangle."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+princess-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# D20 — frozen, do not re-litigate.  `object` reads the container, `gimli`
+# decodes `.debug_*`, `addr2line` turns an address into a line/function.  Note
+# that `gimli` and `addr2line` are BOTH required: the split is deliberate
+# (addr2line for the lookup path, gimli for the raw unit/range details the
+# side-by-side "disassembly + source line" UI needs).
+object = { version = "0.40.0", default-features = false, features = [
+    "read_core",
+    "elf",
+    "std",
+    "compression",
+] }
+gimli = "0.34.0"
+addr2line = "0.27.1"
+rustc-demangle = "0.1.28"
+cpp_demangle = "0.5.1"
+
+[dev-dependencies]
+# Fixture-driven integration tests read the ELF through the same `object`
+# version the library uses.
+serde_json = { workspace = true }
