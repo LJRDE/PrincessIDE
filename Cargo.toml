@@ -8,6 +8,7 @@ members = [
     "crates/princess-symbol",
     "crates/princess-bin",
     "crates/princess-debug",
+    "crates/princess-ai",
 ]
 
 [workspace.package]

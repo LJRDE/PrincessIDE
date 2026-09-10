@@ -1,0 +1,13 @@
+[package]
+name = "princess-build"
+description = "PrincessIDE build engine (P2-B1): toolchain detection, the make backend, compiler/linker/assembler diagnostics, artifact discovery, and the kernel-specialised clangd project configuration (D7/D8/D17/D18)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+princess-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
