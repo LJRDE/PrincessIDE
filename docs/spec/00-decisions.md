@@ -77,9 +77,11 @@
 - **推翻原因**：先前判定「Mimo 不可用」是**我自己的错**——探测时模型 id 猜成了 `mimo`（无效 id），并非通道故障。 **[实测]**
 
 ## D12' 模型路由（现行）
-- **默认**：子 Agent 一律用 **`xiaomi-token-plan-cn` / `mimo-v2.5-pro`**（MiMo-V2.5-Pro）——机械活、调研、文档、模板、可视化、打包等。
-- **例外**：**只有重点任务**用 **`deepseek-official` / `deepseek-v4-flash`**——核心引擎实现（P2-B `princess-build`/`run`/`symbol`）、关键架构决策、最终独立验收。
+- **默认（现行，用户指令）**：**所有** Agent 一律用 **`xiaomi-token-plan-cn` / `mimo-v2.5-pro`**——实现、调研、文档、模板、可视化、打包、**代码审查与分析**，全覆盖。**Mimo token 不限量。**
+- **⚠️ DeepSeek 配额告急（用户指令）**：DeepSeek 的 token 快用完，**原则上不再派发任何 DeepSeek Agent**（原「重点任务用 Flash」的例外条款**暂停**）。凡事先用 Mimo；**确实非 DeepSeek 不可时才提出并说明理由**。
 - **禁用**：`deepseek-v4-pro`（用户明确要求不用）。
+- **主 Agent 自身也在消耗 DeepSeek**：本会话（web profile 默认模型）跑的就是 `deepseek-v4-flash`。因此主 Agent **必须主动压缩自身开销**：报告从简、不做无谓的大文件重读、批量工具调用、避免把大段输出灌进上下文。用户可在 GUI 的模型设置里把本会话切到 Mimo；或由主 Agent 预置 web profile 覆盖层，**下次会话启动即生效**（见 A10）。
+- **独立验收的对抗性如何保障**（DeepSeek 退出后的补偿措施）：写者与判者仍分离，但改由**结构保证**而非模型差异——判者必须：① 亲自执行验收命令、② 只看**原始输出与退出码**不看自述、③ 必须打**负样本**、④ 必须**主动找反例**（调研 C 第二棒正是靠这条推翻了第一棒的假阴性）。
 - **模型 id 权威来源** [实测]：`@earendil-works/pi-ai/dist/providers/data/xiaomi-token-plan-cn.json`
   - provider `xiaomi-token-plan-cn`，baseUrl `https://token-plan-cn.xiaomimimo.com/v1`，api `openai-completions`
   - 可用模型：`mimo-v2.5-pro`（MiMo-V2.5-Pro，1M 上下文 / 128K 最大输出）、`mimo-v2.5`
