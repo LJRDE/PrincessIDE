@@ -158,3 +158,4 @@ cd /root/PrincessIDE && DSH_PERMISSION_MODE=danger-full-access \
 3. **污染检查**：确认没有引用废弃草稿（`_work/` 等）；确认构建产物与 `.toolchain/` 没被提交进 git。
 4. **越界检查**：确认 Agent 只改了自己被授权的目录（`git show --stat` 可查）。
 5. 复核结论写进 `docs/reports/<phase>-review.md`，**与实现者报告分开**。
+- ⚠️ **headless 任务的启动写法（实测教训）**：必须让 `dsh --profile headless … > <log> 2>&1` 作为后台 job 的**前台命令**（job 存活即代理由存活，完成时会自动通知）；**不要**用 `nohup … &` + 立即退出——那样 job 会立刻报 completed，**丢失完成信号与自动通知**。另：dsh 重定向到文件时 stdout 有缓冲，日志可能长时间为 0 字节，**判断存活要看 `ps` 与 Agent 自己写的 `PROGRESS.md`**，不要只看日志大小。
