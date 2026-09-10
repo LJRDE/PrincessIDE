@@ -1,0 +1,17 @@
+[package]
+name = "princess-cli"
+description = "PrincessIDE headless acceptance vehicle: doctor/build/run/symbolicate/events over the frozen event stream."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "princess-cli"
+path = "src/main.rs"
+
+[dependencies]
+princess-core = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+libc = { workspace = true }

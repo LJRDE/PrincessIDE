@@ -1,0 +1,45 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/princess-core",
+    "crates/princess-cli",
+    "crates/princess-build",
+    "crates/princess-run",
+    "crates/princess-symbol",
+    "crates/princess-bin",
+    "crates/princess-debug",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid/princesside"
+authors = ["PrincessIDE P2 Agent"]
+
+[workspace.dependencies]
+princess-core = { path = "crates/princess-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+sha2 = "0.10"
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "macros",
+    "process",
+    "io-util",
+    "time",
+    "sync",
+    "signal",
+] }
+libc = "0.2"
+
+[profile.release]
+debug = "line-tables-only"
+
+# The kernel-adjacent crates are built on a host that has no display and no KVM;
+# nothing here needs an optimised build, but keep the test profile fast to link.
+[profile.dev]
+incremental = true

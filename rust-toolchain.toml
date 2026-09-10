@@ -1,0 +1,10 @@
+# PrincessIDE pins the *host* Rust toolchain to the stable channel that
+# scripts/bootstrap-toolchain.sh installs inside .toolchain/ (RUSTUP_HOME /
+# CARGO_HOME are redirected there by scripts/env.sh).
+#
+# No `components` list on purpose: rustfmt/clippy are already present in the
+# workspace toolchain and listing them would make rustup try to fetch anything
+# that is missing (rustup's official dist server measured 62 B/s on this host,
+# see docs/p0-toolchain-report.md §3.2).
+[toolchain]
+channel = "stable"
