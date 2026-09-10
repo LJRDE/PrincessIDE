@@ -125,3 +125,18 @@
 | 4 | A9 报告 (`docs/reports/a9-gdb16.md`) | ⏸ 我可亲自写（证据齐全） |
 | 5 | P2-C 全链集成验收 | ⏸ 依赖 3 |
 | 6 | P8 产品化（打包/文档/冒烟 CI） | ⏸ 依赖 5 |
+
+### workspace 绿度（D24 追踪）
+
+| crate | 测试 | 状态 |
+|---|---|---|
+| `princess-core` | 4/4 | ✅ |
+| `princess-build` | 61/61 | ✅ |
+| `princess-run` | 62/62 | ✅ |
+| `princess-symbol` | 55/55 | ✅ |
+| `princess-debug` | 85+ | ✅ |
+| `princess-cli` | 40/40 | ✅ |
+| **`princess-bin`** | **109/109** | ✅ **首次通过，workspace 7/8 已绿** |
+| **`princess-ai`** | **49/50** | ❌ **1 个失败**（cancel 竞态，根因已被 Mimo Agent 诊断清楚） |
+
+**D24 集成门只差 `princess-ai` 的 1 个测试修复。**
