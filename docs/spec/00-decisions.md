@@ -39,9 +39,10 @@
 ## D7 clangd 工程配置的硬约束（防 glibc 头污染）
 - **决策**：内核工程必须由 IDE 生成/校验 `.clangd` 配置，至少包含：
   - 显式写死 triple（`--target=x86_64-unknown-none`），**不依赖 `--query-driver` 自动推断**；
-  - **用 `-nostdlibinc`，绝不用 `-nostdinc`**（`-nostdinc` 会让 clangd 直接崩溃）；
+  - **用 `-nostdlibinc`，绝不用 `-nostdinc`**：因为 clang 的 `-nostdinc` 会把 **clang 自带的 freestanding 头也一起删掉**，导致内核工程满屏诊断；
   - 在 `CompileFlags.Remove` 里删掉 gcc 专用 flag（如 `-mno-red-zone` 之类被 clangd 报错项）。
 - **证据**：报告 §2.4 / §2.5 / §2.6 / §2.7 全部实测。 **[实测]**
+- **⚠️ 勘误（A1 独立复核）**：研究报告 §2.4 的**标题**称「`-nostdinc` 会让 clangd **直接崩掉**」，**实测无法复现**——clangd-16 并不崩溃，而是**正常报 16 条诊断、以退出码 3 结束**（3 = 「有诊断」，不是崩溃）。**机制层面的实质结论仍成立**（cc1 参数可见 `-nostdsysteminc -nobuiltininc`，证明 freestanding 头确实被删）。**故决策不变，但依据从「会崩溃」改为「满屏诊断」**。详见 `docs/reports/a1-clangd16.md` §A1-7。
 - **附加认知**：target triple 本身**不能**阻止 glibc 头污染；clangd 报「0 errors」**不等于**能编译过。
 
 ## D8 `compile_commands.json` 生成策略

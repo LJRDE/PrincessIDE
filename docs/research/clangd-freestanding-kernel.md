@@ -10,6 +10,18 @@
 > - **【推测】** = 我的推断，未经证实
 >
 > 复现用的全部临时资产在 `/root/PrincessIDE/.researchA/`（非交付目录，可删）。
+
+---
+
+> ## ⚠️ 勘误（由 A1 任务 Agent 独立复核后追加）
+>
+> **§2.4 的标题「`-nostdinc` 会让 clangd 直接崩掉」不成立，请以本勘误为准。**
+>
+> 独立复核在 **clangd-16** 上实测：`-nostdinc` **不会**让 clangd 崩溃或异常退出，而是**正常报出 16 条诊断、以退出码 3 结束**（clangd 退出码 3 =「检查完成但有诊断」，不是崩溃）。
+>
+> **但 §2.4 的机制结论仍然成立、且依然有价值**：clang 的 `-nostdinc` 会把 **clang 自带的 freestanding 头也一起删掉**（cc1 参数可见 `-nostdsysteminc -nobuiltininc`），于是内核工程满屏诊断；正确做法依然是改用 `-nostdlibinc`。
+>
+> **结论不变，依据从「会崩溃」修正为「满屏诊断」。** 完整证据见 `docs/reports/a1-clangd16.md`（A1-6 / A1-7 两节）与 `docs/spec/00-decisions.md` 的 D7 勘误条目。
 > 报告本身只写入 `docs/research/`，未触碰 `docs/spec/`、`apps/`、`crates/`、`fixtures/`、`scripts/`。
 
 ---
