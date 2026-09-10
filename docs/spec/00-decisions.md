@@ -75,10 +75,23 @@
 - **模型 id 权威来源** [实测]：`@earendil-works/pi-ai/dist/providers/data/xiaomi-token-plan-cn.json`
   - provider `xiaomi-token-plan-cn`，baseUrl `https://token-plan-cn.xiaomimimo.com/v1`，api `openai-completions`
   - 可用模型：`mimo-v2.5-pro`（MiMo-V2.5-Pro，1M 上下文 / 128K 最大输出）、`mimo-v2.5`
-- **操作约束（重要，决定我怎么派活）** [实测]：`subagent` / `subagent_fork` 工具**没有** model 参数（宿主 `subagent-model-selection` 默认关闭）。**要指定模型就必须走 `workflow` 的 `agent(prompt,{provider,model})`**，而 `workflow` 是**前台阻塞**的。因此：
-  - 需路由到 **Mimo** 的活 → 用 `workflow`（前台阻塞，适合中小任务）
-  - 需**后台并行**的长耗时重活 → 只能用 `subagent`（继承会话默认 = DeepSeek Flash）
-  - 若要「后台 + Mimo」同时成立 → 需在 DSH 设置里打开 `subagent-model-selection` 并把 `mimo-v2.5-pro` 加入 allowlist（**待用户决定**，见开放待办 A6）
+- **派发机制（主 Agent 已实测打通，取代早先的绕过方案）** [实测]：
+  - **Mimo（默认走这条）**：后台执行 `dsh --profile headless "<完整任务书>"`。headless profile 的默认模型已通过 `~/.dsh/profiles/headless/cordis.patch.yml` 改为 `xiaomi-token-plan-cn/mimo-v2.5-pro`，**不占用交互会话、无需重启、可真正后台并行**。
+    - **必须带 `DSH_PERMISSION_MODE=danger-full-access`**，否则 headless 默认 `workspace-write` + 审批 `ask`，而无应答者会 fail closed。
+    - **必须在项目根目录启动**（`workspaceRoot = process.cwd()`）。
+    - 已验证：composed config 生效为 mimo，且真实跑通一个带 bash 工具调用的任务（返回 `42`，exit 0）。
+  - **Flash（重难点专用）**：同一命令加 `--patch scripts/dispatch/flash.patch.yml`，把默认模型覆盖回 `deepseek-official/deepseek-v4-flash`（已实测两路各自解析正确）。
+  - **两条通道的取舍（重要）**：
+
+    | 通道 | 模型 | 后台 | 中途 steering | 完成通知 |
+    |---|---|---|---|---|
+    | `bash` + `dsh --profile headless` | **Mimo**（默认） | ✅ | ❌ 无 agent id | ❌ 需 `job_output` 轮询 |
+    | `subagent` 工具 | Flash（会话默认） | ✅ | ✅ `send_message` | ✅ 自动推送 |
+
+    → **Mimo 任务必须一次给足完整任务书，并要求 Agent 把进度与结论写进文件**，由我轮询；不能像 `subagent` 那样中途纠正。
+  - `workflow` 仍可用（能逐路指定模型），但它**前台阻塞**，只适合短任务。
+  - **不采用的方案**：宿主的 `subagent-model-selection` 设置——它只在插件安装时构建工具 schema，需重启 web 会话才生效，而 headless 通道已完全覆盖需求，故不动用户会话。
+  - **并发上限（配合 D16）**：headless 每次运行 = 一个新 Node 进程 + 一个 Agent（约 200~300MB）。本机可用内存约 1.4G，**同时最多 2~3 个 headless 任务**，重活必须错开。
 
 ## D13 环境与权限现状（P0 之后发生变化）
 - 文件沙箱已放开为 **danger-full-access**；**审批提示已关闭**（不要请求提权，直接执行）。

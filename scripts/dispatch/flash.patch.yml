@@ -1,0 +1,13 @@
+# 重难点任务的模型覆盖层：把 headless 默认的 MiMo 临时切回 DeepSeek Flash。
+#
+# 用途（见 docs/spec/00-decisions.md D12'）：核心引擎实现、关键架构决策、
+# 最终独立验收等「重难点」任务使用本覆盖层；其余一律用默认的 MiMo Pro。
+#
+# 用法：
+#   dsh --profile headless --patch scripts/dispatch/flash.patch.yml "<task>"
+#
+# 注意：--patch 的叠加顺序在 profile 层之后，因此它稳定覆盖 cordis.patch.yml。
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-flash

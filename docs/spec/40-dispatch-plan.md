@@ -43,6 +43,30 @@ PrincessIDE：面向 x86_64 操作系统内核开发的 Linux 桌面 IDE（Tauri
 
 ---
 
+## 一之二、怎么派活（启动命令，主 Agent 专用）
+
+**默认（机械活 / 调研 / 文档 / 模板 / 可视化）→ Mimo**
+```bash
+cd /root/PrincessIDE && DSH_PERMISSION_MODE=danger-full-access \
+  dsh --profile headless "<完整任务书>" 2>&1 | tail -40
+```
+用 bash 工具的 `run_in_background: true` 启动 → 真正的后台并行，用 `job_output` 收结果。
+
+**重难点（核心引擎实现、关键架构决策、最终独立验收）→ DeepSeek Flash**
+```bash
+cd /root/PrincessIDE && DSH_PERMISSION_MODE=danger-full-access \
+  dsh --profile headless --patch scripts/dispatch/flash.patch.yml "<完整任务书>" 2>&1 | tail -40
+```
+或者直接用 `subagent` 工具（会话默认就是 Flash，且支持 `send_message` 中途纠偏 + 自动完成通知）。
+
+**为什么必须这样**：`subagent` 工具没有 model 参数（宿主 `subagent-model-selection` 需重启会话才生效，已放弃）。headless profile 的默认模型已在 `~/.dsh/profiles/headless/cordis.patch.yml` 里改为 `mimo-v2.5-pro`，用户的 web 会话不受影响。详见 `00-decisions.md` D12'。
+
+**代价与纪律**：
+- headless 任务**无法中途 steering、无自动完成通知** → 任务书必须一次给足，且**要求 Agent 把进度与最终报告写进文件**（放 `docs/reports/` 或 `.scratch/`），我靠轮询文件与 job 输出来收活。
+- **每次 headless = 一个 Node 进程 + 一个 Agent**；配合 D16，**同时最多 2~3 个**，重活错开。
+
+---
+
 ## 二、批次总表
 
 | 批次 | 内容 | 依赖 | 并行度 | 状态 |
