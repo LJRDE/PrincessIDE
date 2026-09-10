@@ -1,0 +1,13 @@
+[
+  {
+    "thread-id": 333695,
+    "props": {
+      "core-id": 0,
+      "thread-id": 0,
+      "socket-id": 0
+    },
+    "qom-path": "/machine/unattached/device[0]",
+    "cpu-index": 0,
+    "target": "x86_64"
+  }
+]

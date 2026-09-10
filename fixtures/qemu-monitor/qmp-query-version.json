@@ -1,0 +1,8 @@
+{
+  "qemu": {
+    "micro": 22,
+    "minor": 2,
+    "major": 7
+  },
+  "package": "Debian 1:7.2+dfsg-7+deb12u18+b3"
+}

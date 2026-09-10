@@ -1,0 +1,9 @@
+recorded-by: fixtures/qemu-monitor/regenerate.sh
+recorded-at: 2026-09-10T16:40:09Z
+fixture:     fixtures/paging-kernel (patched-paging multiboot2 kernel)
+guest-state: halted after deliberate #PF; paging enabled, CR3=0x0000000000104000
+qemu-argv:   qemu-system-x86_64 -L $PRINCESSIDE_QEMU_DATA -m 256M \
+               -cdrom build/pagingkernel.iso -boot d -display none \
+               -serial stdio -monitor none -qmp unix:<tmp>/qmp.sock,server=on,wait=off -no-reboot
+hmp-queries: info registers | info mem | info tlb | info cpus
+qmp-queries: query-version | query-status | query-cpus-fast | query-memory-size-summary
