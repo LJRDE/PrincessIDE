@@ -133,6 +133,7 @@ backend  = "make"       # make | cmake | cargo | zig | custom
 command  = "make"       # 可选：覆盖默认调用
 cwd      = "."
 targets  = ["all"]
+jobs     = 4          # 可选：构建并行度。缺省时引擎**什么都不注入**，交给 make/cargo 自行决定
 artifacts = ["build/kernel.elf"]
 compile_commands = "compile_commands.json"   # 供 clangd 使用
 

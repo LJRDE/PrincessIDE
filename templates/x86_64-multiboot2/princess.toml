@@ -16,6 +16,9 @@ backend = "make"
 command = "make"
 cwd = "."
 targets = ["all"]
+# Optional: build parallelism. When omitted the engine injects NOTHING and
+# lets make/cargo decide. Set it explicitly to pin the job count.
+jobs = 4
 artifacts = ["build/kernel.elf"]
 compile_commands = "compile_commands.json"
 

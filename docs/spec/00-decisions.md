@@ -196,6 +196,16 @@
 - **现状**：`cargo test --workspace` **不是绿的**——`princess-bin`(P5) 有 **16 个编译错误**、`princess-build`(P2-B) 曾有 4 个失败测试。P2-A 只能保证 `-p princess-core -p princess-cli` **85/85 全绿**（这部分已达成）。
 - **裁决**：验收文档里 P2-1 的 `cargo test --workspace` 是**集成门**，只有等 B/P5 各路收敛后才可能满足；**在 **P2-C** 阶段由主 Agent 亲自把关**，届时必须全绿才可宣布 P2 完成。在此之前，**不得**把「某 crate 自己绿」表述为「P2 完成」。 **[裁决]**
 
+## D25 开发机纪律**不得**泄漏进产品行为（`[build] jobs`）
+- **发现**：B1 在 `crates/princess-build/src/backend.rs` 中**无条件**注入 `CARGO_BUILD_JOBS=1` 与 `MAKEFLAGS=-j1`（并写了断言「总是 1」的单测）。
+- **裁决：必须修**。**[裁决]** 理由：D21 是**我们开发沙箱**的内存纪律（当时还没有 swap），**不是 IDE 该强加给用户机器的属性**——用户 32 核机器也会被强制单线程构建。此外我们已加 4G swap，原理由对开发机也已不成立。
+- **契约变更（§4）**：`princess.toml` 的 `[build]` 新增**可选字段 `jobs`**：
+  - **缺省 = 什么都不注入**（交给 make/cargo 自行决定）；
+  - `jobs = N` 时注入 `MAKEFLAGS=-jN` 与 `CARGO_BUILD_JOBS=N`；
+  - 未配置时环境里已有的 `CARGO_BUILD_JOBS`/`MAKEFLAGS` **必须原样保留**。
+- **连带修复**：P6 模板的字段符合性自检要求「模板含全部契约字段」，故已给 `templates/x86_64-multiboot2/princess.toml` 补上 `jobs` 示例并**重跑自检通过**（37 → **38** 个字段路径、`0 unknown`、横幅断言 PASS、exit 0）。
+- **通用教训**：**开发环境的资源约束只应体现在「派发指令」与「测试脚本的环境变量」里，绝不能写进产品代码路径。** 后续每个阶段审查时都要按这条检查一遍。
+
 ---
 
 ## 开放待办（Open Actions）
