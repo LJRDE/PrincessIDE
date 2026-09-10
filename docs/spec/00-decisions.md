@@ -64,9 +64,21 @@
 - **现状**：初定「Rust 侧自写 DAP 适配层包装 GDB/MI」。调研 C 正在核实 GDB 14+ 自带的 `gdb -i=dap` 能否直接用（若能，可省掉整层适配）。
 - **决策规则（预先定好，避免返工）**：若 `gdb -i=dap` [实测] 可用且能力覆盖 P4 验收项 → **直接用内置 DAP**；否则自写 MI→DAP 适配层。 **[裁决]**
 
-## D12 模型路由：只用 `deepseek-official/deepseek-v4-flash`
-- **决策**：所有 Agent 与验收 Agent 一律用 **DeepSeek Flash**，**不使用 `deepseek-v4-pro`**（用户指令：Flash 已更便宜更强）。
-- **Mimo 通道**：单次探测失败（子 Agent 直接返回 null），按用户指示**不纠缠，已弃用**。 **[实测]** **[裁决]**
+## D12 模型路由：~~只用 DeepSeek Flash，Mimo 弃用~~ → **已推翻，见 D12'**
+- ~~原决策：一律 `deepseek-official/deepseek-v4-flash`，禁用 `deepseek-v4-pro`，Mimo 通道弃用。~~
+- **推翻原因**：先前判定「Mimo 不可用」是**我自己的错**——探测时模型 id 猜成了 `mimo`（无效 id），并非通道故障。 **[实测]**
+
+## D12' 模型路由（现行）
+- **默认**：子 Agent 一律用 **`xiaomi-token-plan-cn` / `mimo-v2.5-pro`**（MiMo-V2.5-Pro）——机械活、调研、文档、模板、可视化、打包等。
+- **例外**：**只有重点任务**用 **`deepseek-official` / `deepseek-v4-flash`**——核心引擎实现（P2-B `princess-build`/`run`/`symbol`）、关键架构决策、最终独立验收。
+- **禁用**：`deepseek-v4-pro`（用户明确要求不用）。
+- **模型 id 权威来源** [实测]：`@earendil-works/pi-ai/dist/providers/data/xiaomi-token-plan-cn.json`
+  - provider `xiaomi-token-plan-cn`，baseUrl `https://token-plan-cn.xiaomimimo.com/v1`，api `openai-completions`
+  - 可用模型：`mimo-v2.5-pro`（MiMo-V2.5-Pro，1M 上下文 / 128K 最大输出）、`mimo-v2.5`
+- **操作约束（重要，决定我怎么派活）** [实测]：`subagent` / `subagent_fork` 工具**没有** model 参数（宿主 `subagent-model-selection` 默认关闭）。**要指定模型就必须走 `workflow` 的 `agent(prompt,{provider,model})`**，而 `workflow` 是**前台阻塞**的。因此：
+  - 需路由到 **Mimo** 的活 → 用 `workflow`（前台阻塞，适合中小任务）
+  - 需**后台并行**的长耗时重活 → 只能用 `subagent`（继承会话默认 = DeepSeek Flash）
+  - 若要「后台 + Mimo」同时成立 → 需在 DSH 设置里打开 `subagent-model-selection` 并把 `mimo-v2.5-pro` 加入 allowlist（**待用户决定**，见开放待办 A6）
 
 ## D13 环境与权限现状（P0 之后发生变化）
 - 文件沙箱已放开为 **danger-full-access**；**审批提示已关闭**（不要请求提权，直接执行）。
@@ -103,3 +115,4 @@
 | A3 | 清理废弃草稿（`_work/`、`_toolchain/`、`.researchA/`）——**等调研 C/D 用完 `.researchC/.researchD` 后再删** | 主 Agent | 无（已 gitignore） |
 | A4 | 主编排：P2-B（`princess-build`/`run`/`symbol`）派发，依赖 P2-A 的 `princess-core` 类型 | 主 Agent | P2 验收 |
 | A5 | 编辑器组件最终选型复核（P3 Agent 自决，主 Agent 复核） | P3 进行中 | P3 验收 |
+| A6 | **是否开启 `subagent-model-selection`**：开启后我才能「后台派发 + 指定 Mimo 模型」；不开启则路由 Mimo 只能用前台阻塞的 `workflow`（见 D12'） | **待用户决定** | 我的派发方式与效率 |
