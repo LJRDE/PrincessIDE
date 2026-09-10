@@ -1,0 +1,46 @@
+# PrincessIDE project descriptor — x86_64 + Multiboot2 + GRUB ISO template.
+#
+# The field names below follow docs/spec/10-contracts.md §4 verbatim; the engine
+# rejects unknown keys (fail loud), so do not invent new ones.  Relative paths
+# are resolved against the project root.
+
+schema = 1
+
+[project]
+name = "x86_64-multiboot2"
+language = "c"
+arch = "x86_64"
+
+[build]
+backend = "make"
+command = "make"
+cwd = "."
+targets = ["all"]
+artifacts = ["build/kernel.elf"]
+compile_commands = "compile_commands.json"
+
+[run]
+backend = "qemu"
+kernel = "build/kernel.elf"
+boot = "multiboot2"
+# D9 serial contract: -display none -serial stdio -monitor none.
+# D2 boot path: GRUB ISO via -cdrom + -boot d (never `-kernel`).
+args = ["-m", "256M", "-cdrom", "build/kernel.iso", "-boot", "d", "-display", "none", "-serial", "stdio", "-monitor", "none", "-no-reboot"]
+timeout_ms = 30000
+serial = { device = "com1", tee_to_file = "build/serial.log" }
+
+[debug]
+backend = "gdb"
+symbols = "build/kernel.elf"
+stub = { host = "127.0.0.1", port = 1234, mode = "launch" }
+
+[toolchain]
+cc = "gcc"
+as = "as"
+ld = "ld"
+gdb = "gdb"
+
+[ai]
+provider = "openai-compatible"
+base_url = ""
+model = ""
