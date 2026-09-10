@@ -1,0 +1,51 @@
+# PrincessIDE — repository ignore rules.
+
+# ---------------------------------------------------------------------------
+# Workspace-local toolchain.
+# Installed by scripts/bootstrap-toolchain.sh; several GB of rustup toolchain,
+# cargo registry and unpacked .deb trees.  Never commit it.
+# ---------------------------------------------------------------------------
+.toolchain/
+
+# A second, accidentally duplicated toolchain tree (underscore-prefixed scratch
+# directory created by a parallel agent workflow).  Same class of content as
+# .toolchain/ above and never source.
+_toolchain/
+
+# Rust build artifacts.
+target/
+
+# Node / Web artifacts (later phases).
+node_modules/
+dist/
+.pnpm-store/
+
+# Native build outputs.
+*.o
+*.a
+*.so
+*.d
+
+# Kernel artifacts.
+*.elf
+*.bin
+*.iso
+*.img
+*.map
+
+# Debian package cache (scripts/bootstrap-toolchain.sh downloads these).
+*.deb
+
+# Test / smoke output.
+*.log
+fixtures/refkernel/build/
+fixtures/refkernel/path-a-probe/*.o
+fixtures/refkernel/path-a-probe/*.elf
+fixtures/refkernel/path-a-probe/*.iso
+
+# Editor / OS noise.
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
