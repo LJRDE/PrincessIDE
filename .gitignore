@@ -49,3 +49,8 @@ fixtures/refkernel/path-a-probe/*.iso
 *.swp
 *~
 .DS_Store
+
+# Scratch dirs left by research/experiment agents (never commit).
+.scratch/
+.research*/
+_work/
