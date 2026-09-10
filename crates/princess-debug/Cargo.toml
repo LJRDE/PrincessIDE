@@ -1,0 +1,17 @@
+[package]
+name = "princess-debug"
+description = "PrincessIDE debug engine (P4/D11): GDB built-in DAP transport over stdio, plus the thin capability layer the built-in DAP lacks for bare-metal kernels (hardware breakpoints, physical memory, register panel, REPL escape hatch) and the D10 architecture self-check."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+princess-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+libc = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
