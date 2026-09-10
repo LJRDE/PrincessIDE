@@ -1,0 +1,21 @@
+# PrincessIDE pnpm workspace.
+#
+# P3 owns this file.  Only the desktop app is a pnpm package today; the Rust
+# engine (crates/, root Cargo.toml) is orchestrated by cargo, not by pnpm, and
+# deliberately stays out of this workspace file.
+packages:
+  - "apps/desktop"
+
+# pnpm >= 10 blocks dependency lifecycle scripts by default.  esbuild's
+# postinstall only wires up the platform binary that already arrives through
+# optionalDependencies, but allow-listing it keeps the install deterministic and
+# stops `pnpm install` exiting non-zero with ERR_PNPM_IGNORED_BUILDS.
+#
+# pnpm 12 (the version pinned in this repo) reads the `allowBuilds` map; pnpm 10
+# read the `onlyBuiltDependencies` list.  Both forms are kept so the checkout
+# installs cleanly on either major.
+allowBuilds:
+  esbuild: true
+
+onlyBuiltDependencies:
+  - esbuild

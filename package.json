@@ -1,0 +1,14 @@
+{
+  "name": "princesside",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PrincessIDE — x86_64 kernel development IDE (Tauri + Rust engine + Vite/TS frontend)",
+  "license": "MIT",
+  "scripts": {
+    "build": "pnpm -C apps/desktop build",
+    "test": "pnpm -C apps/desktop test",
+    "check:contract": "pnpm -C apps/desktop check:contract",
+    "dev": "pnpm -C apps/desktop dev",
+    "tauri": "pnpm -C apps/desktop tauri"
+  }
+}

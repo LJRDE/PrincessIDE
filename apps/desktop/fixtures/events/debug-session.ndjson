@@ -1,0 +1,13 @@
+# PrincessIDE event fixture — DEBUG SESSION (CONSTRUCTED by P3-A, NOT a P2 recording).
+# Covers the debug.* / symbols.* / artifact.* kinds of docs/spec/10-contracts.md §2
+# so the replay test exercises every branch of the frontend state machine.
+# Fixed assertion constant from docs/spec/20-acceptance.md §0: refkernel_fault_probe
+{"v":1,"seq":1,"ts":"2026-05-05T13:00:00.000Z","opId":"op-d001","kind":"debug.breakpoint.changed","payload":{"id":1,"verified":true,"location":"refkernel_fault_probe"}}
+{"v":1,"seq":2,"ts":"2026-05-05T13:00:00.200Z","opId":"op-d001","kind":"debug.stopped","payload":{"reason":"entry","threadId":1,"frame":{"id":0,"name":"kmain","file":"fixtures/refkernel/kernel.c","line":18,"pc":"0x0000000000100500"},"regs":{"rip":"0x0000000000100500","rsp":"0x0000000000109f00"}}}
+{"v":1,"seq":3,"ts":"2026-05-05T13:00:00.260Z","opId":"op-d001","kind":"debug.output","payload":{"category":"console","text":"Breakpoint 1 at 0x100abc: file fixtures/refkernel/kernel.c, line 42.\n"}}
+{"v":1,"seq":4,"ts":"2026-05-05T13:00:01.100Z","opId":"op-d001","kind":"debug.stopped","payload":{"reason":"breakpoint","threadId":1,"frame":{"id":0,"name":"refkernel_fault_probe","file":"fixtures/refkernel/kernel.c","line":42,"pc":"0x0000000000100abc"},"regs":{"rip":"0x0000000000100abc","rax":"0x00000000deadbeef","cs":"0x0008"}}}
+{"v":1,"seq":5,"ts":"2026-05-05T13:00:01.200Z","opId":"op-d001","kind":"log.append","payload":{"stream":"gdb.console","chunk":"(gdb) info registers rip\nrip            0x100abc\t0x100abc <refkernel_fault_probe+12>\n","encoding":"utf8"}}
+{"v":1,"seq":6,"ts":"2026-05-05T13:00:01.700Z","opId":null,"kind":"symbols.indexed","payload":{"artifact":"fixtures/refkernel/build/refkernel.elf","buildId":"a3f91c0d5e7b2468","symbolCount":47}}
+{"v":1,"seq":7,"ts":"2026-05-05T13:00:01.800Z","opId":null,"kind":"artifact.changed","payload":{"path":"fixtures/refkernel/build/refkernel.elf","kind":"elf"}}
+{"v":1,"seq":8,"ts":"2026-05-05T13:00:02.400Z","opId":"op-d001","kind":"debug.output","payload":{"category":"stdout","text":"target halted after step\n"}}
+{"v":1,"seq":9,"ts":"2026-05-05T13:00:02.900Z","opId":null,"kind":"log.append","payload":{"stream":"ide","chunk":"debug session closed\n","encoding":"utf8"}}

@@ -1,0 +1,36 @@
+{
+  "name": "@princesside/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PrincessIDE desktop shell — Tauri v2 window + Vite/TypeScript frontend",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:update": "vitest run --update",
+    "test:watch": "vitest",
+    "check:contract": "node scripts/check-contract.mjs",
+    "tauri": "tauri",
+    "tauri:build": "tauri build --no-bundle"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.8.1",
+    "@codemirror/lang-cpp": "^6.0.3",
+    "@codemirror/language": "^6.11.0",
+    "@codemirror/legacy-modes": "^6.5.4",
+    "@codemirror/lsp-client": "^6.2.5",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.36.8",
+    "@tauri-apps/api": "^2.11.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/node": "^24.3.0",
+    "jsdom": "^30.0.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.7"
+  }
+}

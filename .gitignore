@@ -58,3 +58,6 @@ _work/
 # Paging fixture build output.
 fixtures/paging-kernel/build/
 fixtures/qemu-monitor/*.log
+
+# Stray compile artifacts (agents sometimes compile in the repo root).
+a.out

@@ -1,0 +1,15 @@
+# Build configuration for the PrincessIDE Tauri shell.
+#
+# `apps/desktop/src-tauri` is its own cargo workspace (see Cargo.toml), so its
+# build output belongs in its own directory.
+#
+# Why this file exists: the repository-root `.cargo/config.toml` sets
+# `[build] target-dir = "target"`, which cargo resolves to `<repo>/target` — the
+# *same* directory the P2 engine workspace builds into.  Sharing one target dir
+# between two independent workspaces makes them contend on the target-dir lock
+# and re-fingerprint each other's artifacts.  A nested config file wins over the
+# parent one, and its relative `target-dir` is resolved against this directory,
+# so the shell builds into `apps/desktop/src-tauri/target` (already covered by
+# the root `.gitignore`'s `target/` rule).
+[build]
+target-dir = "target"

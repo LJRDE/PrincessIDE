@@ -1,0 +1,39 @@
+[package]
+name = "princesside-desktop"
+version = "0.1.0"
+description = "PrincessIDE desktop shell — Tauri v2 window, IPC registration, child-process orchestration"
+edition = "2021"
+rust-version = "1.77"
+license = "MIT"
+publish = false
+
+[lib]
+name = "princesside_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# The contract (§6.1) mandates tokio::process for child processes.  Only the
+# features the shell needs are enabled.
+tokio = { version = "1", features = ["process", "io-util", "time", "sync", "macros", "rt-multi-thread"] }
+
+# ---------------------------------------------------------------------------
+# Independent cargo workspace (deliberate).
+#
+# `apps/desktop/src-tauri` must NOT be a member of the root workspace owned by
+# P2-A: two agents editing one [workspace] table would conflict, and the Tauri
+# dependency tree is heavy enough that we do not want it in the engine's
+# `cargo test --workspace` runs.  This empty table makes this manifest its own
+# workspace root, so `cargo build` here never touches ../Cargo.toml.
+# ---------------------------------------------------------------------------
+[workspace]
+
+[profile.dev]
+# Tauri debug binaries are enormous; keep the shell buildable on a 4 GB / no-swap
+# machine (D16 memory discipline).
+debug = 1

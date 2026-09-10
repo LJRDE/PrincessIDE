@@ -1,0 +1,12 @@
+# PrincessIDE event fixture — LSP SESSION (CONSTRUCTED by P3-A, NOT a P2 recording).
+# Covers the two event kinds added by the D17 amendment (docs/spec/10-contracts.md §2):
+#   lsp.message { serverId, message }   — header-less JSON-RPC text from the engine
+#   lsp.stopped { serverId, reason }    — shutdown | crashed | killed
+# The D18 language service is clangd-16; the message payloads below are shaped like
+# real clangd replies (initialize result, publishDiagnostics, shutdown).
+{"v":1,"seq":1,"ts":"2026-05-05T14:00:00.000Z","opId":"op-lsp1","kind":"log.append","payload":{"stream":"ide","chunk":"princess:lsp:start → clangd-16 for fixtures/refkernel\n","encoding":"utf8"}}
+{"v":1,"seq":2,"ts":"2026-05-05T14:00:00.180Z","opId":"op-lsp1","kind":"lsp.message","payload":{"serverId":"lsp-1","message":"{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":{\"textDocumentSync\":2,\"completionProvider\":{\"triggerCharacters\":[\".\",\">\",\":\"]},\"hoverProvider\":true,\"definitionProvider\":true},\"serverInfo\":{\"name\":\"clangd\",\"version\":\"16.0.6\"}}}"}}
+{"v":1,"seq":3,"ts":"2026-05-05T14:00:00.320Z","opId":"op-lsp1","kind":"lsp.message","payload":{"serverId":"lsp-1","message":"{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":\"file:///root/PrincessIDE/fixtures/refkernel/serial.c\",\"diagnostics\":[{\"range\":{\"start\":{\"line\":26,\"character\":4},\"end\":{\"line\":26,\"character\":10}},\"severity\":2,\"message\":\"unused parameter 'port'\",\"source\":\"clang\"}]}}"}}
+{"v":1,"seq":4,"ts":"2026-05-05T14:00:01.100Z","opId":null,"kind":"log.append","payload":{"stream":"gdb.console","chunk":"(editor) goto definition → fixtures/refkernel/kernel.c:42\n","encoding":"utf8"}}
+{"v":1,"seq":5,"ts":"2026-05-05T14:00:02.000Z","opId":"op-lsp1","kind":"lsp.stopped","payload":{"serverId":"lsp-1","reason":"shutdown"}}
+{"v":1,"seq":6,"ts":"2026-05-05T14:00:02.100Z","opId":null,"kind":"artifact.changed","payload":{"path":"fixtures/refkernel/build/refkernel.elf","kind":"elf"}}

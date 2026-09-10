@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Capabilities of the PrincessIDE main window: core IPC + event listeners. The engine exposes exactly one dispatcher command (princess_invoke) plus two native aliases; nothing else is reachable from the webview.",
+  "windows": ["main"],
+  "permissions": ["core:default", "core:event:default"]
+}

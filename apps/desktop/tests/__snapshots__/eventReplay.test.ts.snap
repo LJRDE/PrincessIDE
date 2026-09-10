@@ -1,0 +1,363 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`replay: debug session > matches the stored snapshot 1`] = `
+{
+  "ai": {},
+  "appliedEvents": 9,
+  "artifact": {
+    "kind": "elf",
+    "path": "fixtures/refkernel/build/refkernel.elf",
+    "seq": 7,
+  },
+  "build": null,
+  "debug": {
+    "active": true,
+    "breakpoints": {
+      "1": {
+        "id": 1,
+        "location": "refkernel_fault_probe",
+        "verified": true,
+      },
+    },
+    "output": [
+      {
+        "category": "console",
+        "seq": 3,
+        "text": "Breakpoint 1 at 0x100abc: file fixtures/refkernel/kernel.c, line 42.
+",
+      },
+      {
+        "category": "stdout",
+        "seq": 8,
+        "text": "target halted after step
+",
+      },
+    ],
+    "stops": [
+      {
+        "frame": {
+          "file": "fixtures/refkernel/kernel.c",
+          "id": 0,
+          "line": 18,
+          "name": "kmain",
+          "pc": "0x0000000000100500",
+        },
+        "reason": "entry",
+        "regs": {
+          "rip": "0x0000000000100500",
+          "rsp": "0x0000000000109f00",
+        },
+        "seq": 2,
+        "threadId": 1,
+      },
+      {
+        "frame": {
+          "file": "fixtures/refkernel/kernel.c",
+          "id": 0,
+          "line": 42,
+          "name": "refkernel_fault_probe",
+          "pc": "0x0000000000100abc",
+        },
+        "reason": "breakpoint",
+        "regs": {
+          "cs": "0x0008",
+          "rax": "0x00000000deadbeef",
+          "rip": "0x0000000000100abc",
+        },
+        "seq": 4,
+        "threadId": 1,
+      },
+    ],
+  },
+  "diagnostics": [],
+  "duplicates": 0,
+  "gaps": [],
+  "ignored": [],
+  "lastSeq": 9,
+  "logBytes": 106,
+  "logs": [
+    {
+      "encoding": "utf8",
+      "lossy": false,
+      "opId": "op-d001",
+      "seq": 5,
+      "stream": "gdb.console",
+      "text": "(gdb) info registers rip
+rip            0x100abc	0x100abc <refkernel_fault_probe+12>
+",
+      "ts": "2026-05-05T13:00:01.200Z",
+    },
+    {
+      "encoding": "utf8",
+      "lossy": false,
+      "opId": null,
+      "seq": 9,
+      "stream": "ide",
+      "text": "debug session closed
+",
+      "ts": "2026-05-05T13:00:02.900Z",
+    },
+  ],
+  "modelVersion": 1,
+  "needsReplay": false,
+  "outOfOrder": 0,
+  "run": null,
+  "symbols": {
+    "artifact": "fixtures/refkernel/build/refkernel.elf",
+    "buildId": "a3f91c0d5e7b2468",
+    "symbolCount": 47,
+  },
+  "versionMismatches": [],
+}
+`;
+
+exports[`replay: lsp session (D17 amendment events) > matches the stored snapshot 1`] = `
+{
+  "ai": {},
+  "appliedEvents": 6,
+  "artifact": {
+    "kind": "elf",
+    "path": "fixtures/refkernel/build/refkernel.elf",
+    "seq": 6,
+  },
+  "build": null,
+  "debug": {
+    "active": false,
+    "breakpoints": {},
+    "output": [],
+    "stops": [],
+  },
+  "diagnostics": [],
+  "duplicates": 0,
+  "gaps": [],
+  "ignored": [],
+  "lastSeq": 6,
+  "logBytes": 112,
+  "logs": [
+    {
+      "encoding": "utf8",
+      "lossy": false,
+      "opId": "op-lsp1",
+      "seq": 1,
+      "stream": "ide",
+      "text": "princess:lsp:start → clangd-16 for fixtures/refkernel
+",
+      "ts": "2026-05-05T14:00:00.000Z",
+    },
+    {
+      "encoding": "utf8",
+      "lossy": false,
+      "opId": null,
+      "seq": 4,
+      "stream": "gdb.console",
+      "text": "(editor) goto definition → fixtures/refkernel/kernel.c:42
+",
+      "ts": "2026-05-05T14:00:01.100Z",
+    },
+  ],
+  "lsp": {
+    "servers": {
+      "lsp-1": {
+        "messages": [
+          "{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":2,"completionProvider":{"triggerCharacters":[".",">",":"]},"hoverProvider":true,"definitionProvider":true},"serverInfo":{"name":"clangd","version":"16.0.6"}}}",
+          "{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///root/PrincessIDE/fixtures/refkernel/serial.c","diagnostics":[{"range":{"start":{"line":26,"character":4},"end":{"line":26,"character":10}},"severity":2,"message":"unused parameter 'port'","source":"clang"}]}}",
+        ],
+        "serverId": "lsp-1",
+        "stopped": {
+          "reason": "shutdown",
+          "seq": 5,
+        },
+      },
+    },
+  },
+  "modelVersion": 1,
+  "needsReplay": false,
+  "outOfOrder": 0,
+  "run": null,
+  "symbols": null,
+  "versionMismatches": [],
+}
+`;
+
+exports[`replay: refkernel session (build → run → fault → exit) > matches the stored snapshot (P3-4 snapshot assertion) 1`] = `
+{
+  "ai": {
+    "ai-1": {
+      "finished": true,
+      "requestId": "ai-1",
+      "text": "The guest faulted at rip=0x100abc, which symbolication maps to refkernel_fault_probe (kernel.c:42).",
+      "usage": {
+        "completionTokens": 38,
+        "promptTokens": 412,
+        "totalTokens": 450,
+      },
+    },
+  },
+  "appliedEvents": 17,
+  "artifact": {
+    "kind": "elf",
+    "path": "fixtures/refkernel/build/refkernel.elf",
+    "seq": 8,
+  },
+  "build": {
+    "argv": [
+      "make",
+      "-C",
+      "fixtures/refkernel",
+      "all",
+    ],
+    "artifacts": [
+      {
+        "kind": "elf",
+        "path": "fixtures/refkernel/build/refkernel.elf",
+        "sha256": "3f1c0a7d9b2e4f8a5c6d1e0b9a8f7c6d5e4b3a29180f7e6d5c4b3a29180f7e6d",
+        "size": 24640,
+      },
+      {
+        "kind": "iso",
+        "path": "fixtures/refkernel/build/refkernel.iso",
+        "sha256": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "size": 4980736,
+      },
+    ],
+    "backend": "make",
+    "cwd": "/root/PrincessIDE/fixtures/refkernel",
+    "durationMs": 1842,
+    "exitCode": 0,
+    "running": false,
+    "startedAt": "2026-05-05T12:00:00.120Z",
+    "status": "ok",
+    "toolchainId": "host-clang14-nasm",
+  },
+  "debug": {
+    "active": false,
+    "breakpoints": {},
+    "output": [],
+    "stops": [],
+  },
+  "diagnostics": [
+    {
+      "col": 5,
+      "file": "fixtures/refkernel/serial.c",
+      "line": 27,
+      "message": "unused parameter 'port'",
+      "severity": "warning",
+      "source": "clang",
+    },
+  ],
+  "duplicates": 0,
+  "gaps": [],
+  "ignored": [],
+  "lastSeq": 17,
+  "logBytes": 325,
+  "logs": [
+    {
+      "encoding": "utf8",
+      "lossy": false,
+      "opId": null,
+      "seq": 1,
+      "stream": "ide",
+      "text": "PrincessIDE replay session started (fixture: refkernel-session)
+",
+      "ts": "2026-05-05T12:00:00.000Z",
+    },
+    {
+      "encoding": "utf8",
+      "lossy": false,
+      "opId": "op-7f3a",
+      "seq": 3,
+      "stream": "build",
+      "text": "nasm -f elf64 -g -F dwarf -o build/boot.o boot.S
+",
+      "ts": "2026-05-05T12:00:00.240Z",
+    },
+    {
+      "encoding": "utf8",
+      "lossy": false,
+      "opId": "op-7f3a",
+      "seq": 4,
+      "stream": "build",
+      "text": "内核构建中… clang -target x86_64-unknown-none -ffreestanding -nostdlibinc -g -c kernel.c
+",
+      "ts": "2026-05-05T12:00:00.480Z",
+    },
+    {
+      "encoding": "utf8",
+      "lossy": false,
+      "opId": "op-91bb",
+      "seq": 10,
+      "stream": "serial.com1",
+      "text": "PrincessIDE reference kernel booted
+",
+      "ts": "2026-05-05T12:00:02.910Z",
+    },
+    {
+      "encoding": "utf8",
+      "lossy": false,
+      "opId": "op-91bb",
+      "seq": 11,
+      "stream": "qemu.monitor",
+      "text": "QEMU 7.2.22 monitor - type 'help' for more information
+",
+      "ts": "2026-05-05T12:00:02.930Z",
+    },
+    {
+      "encoding": "utf8",
+      "lossy": false,
+      "opId": "op-91bb",
+      "seq": 13,
+      "stream": "serial.com1",
+      "text": "PANIC: unhandled page fault, halting
+",
+      "ts": "2026-05-05T12:00:03.400Z",
+    },
+  ],
+  "modelVersion": 1,
+  "needsReplay": false,
+  "outOfOrder": 0,
+  "run": {
+    "exit": {
+      "exitCode": 1,
+      "reason": "triple-fault",
+      "uptimeMs": 1260,
+    },
+    "fault": {
+      "errorCode": "0x2",
+      "regs": {
+        "cr2": "0x00000000deadbeef",
+        "rax": "0x0000000000000002",
+        "rip": "0x0000000000100abc",
+        "rsp": "0x0000000000109f00",
+      },
+      "rip": "0x0000000000100abc",
+      "symbolicated": {
+        "file": "fixtures/refkernel/kernel.c",
+        "line": 42,
+        "symbol": "refkernel_fault_probe",
+      },
+      "vector": "#PF",
+    },
+    "gdbStub": null,
+    "qemuArgv": [
+      "qemu-system-x86_64",
+      "-m",
+      "512M",
+      "-serial",
+      "stdio",
+      "-display",
+      "none",
+      "-no-reboot",
+      "-cdrom",
+      "build/refkernel.iso",
+    ],
+    "running": false,
+    "startedAt": "2026-05-05T12:00:02.300Z",
+  },
+  "symbols": {
+    "artifact": "fixtures/refkernel/build/refkernel.elf",
+    "buildId": "a3f91c0d5e7b2468",
+    "symbolCount": 47,
+  },
+  "versionMismatches": [],
+}
+`;
