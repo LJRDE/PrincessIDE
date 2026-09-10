@@ -15,14 +15,16 @@
 | **调研 A** | clangd 在 freestanding 内核工程上可用 | ✅ 完成 | ✅ 其 §2.4 标题结论被 A1 对抗复核**推翻并已勘误**（`-nostdinc` 不崩溃，只报诊断） |
 | **调研 B** | QEMU 运行编排 + panic 符号化 | ✅ 完成 | ⏳ 部分结论已被 P0/A1 实践印证（GRUB ISO 路径、串口约定） |
 | **P3-A** | Tauri 外壳 + GUI 依赖 + 纵向切片 | ✅ **完成** | ✅ 我亲跑 `check-contract.mjs` → **`result: ALIGNED`**（21 命令 × 三方逐字一致、10 错误码全对）；`pnpm -C apps/desktop test` → **8 文件 / 81 测试全绿**（含真 CodeMirror 编辑器、事件重放 25 项）；`cargo build`/`pnpm build`/pkg-config 6/6 由其报告提供证据 |
-| **P2-A** | Cargo 工作区 + `princess-core` + `princess-cli` | 🔄 进行中（已被 D19 镜像修复解堵，正在真编译） | — |
-| **调研 C** | 调试协议路线（`gdb -i=dap` 能否直接用） | 🔄 进行中 | — |
-| **调研 D** | ELF/反汇编/hex/页表工具选型 | ✅ **完成** | ✅ 报告逐项表态（`object` 0.40.0 / `gimli`+`addr2line` / `iced-x86` 1.21.0），已冻结为 **D20** |
-| **P5 前置** | 开启分页的内核夹具 + QEMU monitor 样本 | 🔄 交付中（报告待出） | 🔍 我已只读抽查：`CR0.PG=1`、`CR3=0x104000`、真实 `#PF @0x400000` 且错误位解码正确；`info-tlb` 1021 行非退化 → **夹具可用** |
-| **P2-B** | `princess-build` / `run` / `symbol` | ⏸ 等 core 冻结 | — |
-| **P2-C** | 全链集成 + 事件夹具 | ⏸ | — |
-| **P4** | 调试器（DAP + 寄存器/内存/栈/反汇编） | ⏸ 等调研 C | — |
-| **P5** | 可视化（ELF/hex/反汇编/页表/GDT-IDT/monitor） | ⏸ 等调研 D | — |
+| **P2-A** | Cargo 工作区 + `princess-core`（**已冻结**）+ `princess-cli` | 🔄 CLI 已成型（11 模块 / 17.5KB）；事件夹具已产出 | 🔍 我独立解析 `fixtures/events/refkernel-run.ndjson`：31 事件、**seq 严格单调**、信封字段与契约逐字一致、`build.finished=ok` 且产物是**发现**而非硬编码、`run.fault.symbolicated = {refkernel_fault_probe, kernel.c, **line 100**} ✅；**已追问**：`run.exited.reason=timeout` 属有意为之还是掩盖 bug |
+| **调研 C** | 调试协议路线（能否直接用 `gdb -i=dap`） | ✅ **完成** | ✅ 实测 `-i=dap` **可用**（真 `initialize` 响应）；**推翻第一棒假阴性**；对分页夹具拿到**源码级 stackTrace**；关键反例：内置 DAP **没有硬件断点** → 据此冻结 **D11** |
+| **调研 D** | ELF/反汇编/hex/页表工具选型 | ✅ **完成** | ✅ 报告逐项表态（`object` 0.40.0 / `gimli`+`addr2line` / `iced-x86` 1.21.0），冻结为 **D20** |
+| **P5 前置** | 开启分页的内核夹具 + QEMU monitor 样本 | ✅ **完成** | ✅ 我亲跑 `fixtures/paging-kernel/run.sh` → **exit 0**，横幅 + 真实 `#PF` 两条断言 PASS |
+| **A9** | 把 gdb ≥14 提升为一线工具链 | 🔄 报告待出（**能力已验证可用**） | ✅ 我亲测：`princess-gdb --version` → **gdb 16.3**；真 DAP 帧 → `initialize` **success**；**零回归**（不带版本号的 `gdb` 仍 13.1）；`doctor` exit 0（30 工具） |
+| **P2-B1** | `princess-build` | 🔄 进行中（7 模块） | 🔍 我抽查源码：**被禁的 `-W*` 只出现在注释与负样本测试中**；D7 黑名单 / `-nostdlibinc` / triple 全在；D18 的 `clangd-16` 与 `make clean` 有代码强制 + 断言测试 |
+| **P2-B2 / B3** | `princess-run` / `princess-symbol` | 🔄 已开工（2~3 模块） | — |
+| **P4** | 调试器（GDB 内置 DAP + 薄能力层） | 🔄 已开工（**提前**：复核后确认不依赖 B1/B2/B3） | — |
+| **P5** | 可视化后端 `princess-bin` | 🔄 已开工（**提前**，同上） | — |
+| **P2-C** | 全链集成 + 主 Agent 亲验 | ⏸ 等 B 路交付 | — |
 | **P7** | AI 辅助（OpenAI 兼容抽象层） | ⏸ | — |
 | **P8** | 产品化（打包、文档、冒烟 CI） | ⏸ | — |
 
@@ -32,7 +34,7 @@
 
 | 路径 | 内容 |
 |---|---|
-| `docs/spec/00-decisions.md` | **决策日志（ADR）D1~D18** —— 所有冻结决策与勘误，Agent 动手前必读 |
+| `docs/spec/00-decisions.md` | **决策日志（ADR）**D1~D22**** —— 所有冻结决策与勘误，Agent 动手前必读 |
 | `docs/spec/10-contracts.md` | 接口契约：事件模型 / IPC / 错误码 / `princess.toml` / 目录归属 |
 | `docs/spec/20-acceptance.md` | 各阶段可机器执行的验收标准 |
 | `docs/spec/40-dispatch-plan.md` | 派发口径：通用前置、批次表、B1/B2/B3 brief、**怎么派活** |
@@ -41,7 +43,7 @@
 | `templates/x86_64-multiboot2/` + `templates/verify-template.sh` | **可用的内核工程模板 + 自检脚本** |
 | `fixtures/refkernel/` | 唯一权威参考内核夹具（横幅 `PrincessIDE reference kernel booted`，故障符号 `refkernel_fault_probe`） |
 | `scripts/` | `bootstrap-toolchain.sh`（幂等）/ `env.sh` / `doctor.sh` / `smoke-boot.sh` / `symbolicate.sh` |
-| `scripts/dispatch/flash.patch.yml` | 把 headless Agent 临时切回 DeepSeek Flash 的覆盖层 |
+| `scripts/dispatch/flash.patch.yml` | **DeepSeek 配额告急后已改为默认全走 Mimo**；该覆盖层保留备用 |
 
 ---
 
