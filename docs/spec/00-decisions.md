@@ -40,7 +40,8 @@
 - **决策**：内核工程必须由 IDE 生成/校验 `.clangd` 配置，至少包含：
   - 显式写死 triple（`--target=x86_64-unknown-none`），**不依赖 `--query-driver` 自动推断**；
   - **用 `-nostdlibinc`，绝不用 `-nostdinc`**：因为 clang 的 `-nostdinc` 会把 **clang 自带的 freestanding 头也一起删掉**，导致内核工程满屏诊断；
-  - 在 `CompileFlags.Remove` 里删掉 gcc 专用 flag（如 `-mno-red-zone` 之类被 clangd 报错项）。
+  - 在 `CompileFlags.Remove` 里删掉 **gcc 专用 flag 的具体黑名单**（研究 §2.6）：`-fno-tree-loop-distribute-patterns`、`-fconserve-stack`、`-mpreferred-stack-boundary=*`、`-fno-var-tracking-assignments`、`-fno-ipa-icf`、`-mno-direct-extern-access`。
+  - **⚠️ 禁止用通配 `-W*` 做 Remove**（A1 实测）：它会把 `-Wall -Wextra` **一起删掉**，导致**告警诊断整片丢失**——语言服务会显得"很干净"，实际是瞎了。必须用上面那张具体黑名单。
 - **证据**：报告 §2.4 / §2.5 / §2.6 / §2.7 全部实测。 **[实测]**
 - **⚠️ 勘误（A1 独立复核）**：研究报告 §2.4 的**标题**称「`-nostdinc` 会让 clangd **直接崩掉**」，**实测无法复现**——clangd-16 并不崩溃，而是**正常报 16 条诊断、以退出码 3 结束**（3 = 「有诊断」，不是崩溃）。**机制层面的实质结论仍成立**（cc1 参数可见 `-nostdsysteminc -nobuiltininc`，证明 freestanding 头确实被删）。**故决策不变，但依据从「会崩溃」改为「满屏诊断」**。详见 `docs/reports/a1-clangd16.md` §A1-7。
 - **附加认知**：target triple 本身**不能**阻止 glibc 头污染；clangd 报「0 errors」**不等于**能编译过。
@@ -128,6 +129,12 @@
   - `.clangd` 与 `compile_commands.json` 的生成归 **`crates/princess-build`（P2-B/B1）**。
   - **P3 及以后的前端 LSP 工作不得在 Rust 侧重写协议栈**；若发现成熟库不够用，先写进交接摘要由主 Agent 裁决。
 - **状态**：已通知 P3-A（防止其正在做的语言服务接入方向走偏）。
+
+## D18 语言服务与编译数据库的使用纪律（A1 实测，P3/P2-B 必须遵守）
+- **clangd 必须显式使用 `clangd-16`**：不带版本号的 `clangd` **按设计仍然是 14**（零回归），拿错了能力就残缺。`scripts/env.sh` 已导出 `PRINCESSIDE_LANG_SERVICE_CLANGD=clangd-16`，引擎与前端一律用它。
+- **bear 必须通过 PATH 里的启动器调用**（`.toolchain/bin/bear`）：该启动器补齐 4 个硬编码路径；直接调 `prefix/usr/bin/bear` 会失败或**静默漏条目**。
+- **生成 `compile_commands.json` 前必须先 `make clean`**：实测第二次 bear 会用空数组 `[]` **覆盖**已有条目（这是很难察觉的数据损坏）。
+- 不带版本号的 `clang` 同样是 14；LLVM 16 一律走带版本号的名字（`clang-16`、`clangd-16`）。 **[实测]**
 
 ---
 

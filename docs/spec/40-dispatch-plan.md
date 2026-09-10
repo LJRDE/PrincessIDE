@@ -94,10 +94,10 @@ cd /root/PrincessIDE && DSH_PERMISSION_MODE=danger-full-access \
 - **交付**：
   1. 工具链检测（跨编译器路径/版本；缺失 → `E_TOOLCHAIN_MISSING` 并给修复建议）
   2. `BuildBackend` 的 **make 后端**（cmake 后端可延后）
-  3. `compile_commands.json` 生成：**首选 bear**；bear 不可用时用手写 wrapper shim（D8）
+  3. `compile_commands.json` 生成：**首选 bear**；bear 不可用时用手写 wrapper shim（D8）。**必须遵守 D18**：经 PATH 里的 `.toolchain/bin/bear` **启动器**调用（直调 `prefix/usr/bin/bear` 会失败或静默漏条目）；**生成前先 `make clean`**（否则第二次 bear 会用空数组 `[]` **覆盖**已有条目）。
   4. clang/ld/nasm 的**诊断解析** → `build.diagnostic{severity,file,line,col,message,source}`
   5. 构建日志流式回传（`log.append{stream:"build"}`）+ `build.started/finished{artifacts[]}`
-  6. **按 D7/D17 生成并校验内核工程的 `.clangd` 配置**（triple 写死 `--target=x86_64-unknown-none`、用 `-nostdlibinc`、在 `CompileFlags.Remove` 里清掉 clangd 会报错的 gcc 专用 flag）——**这是内核特化差异化的落点**；LSP 的编辑器交互不在引擎侧（D17）
+  6. **按 D7/D17 生成并校验内核工程的 `.clangd` 配置**（triple 写死 `--target=x86_64-unknown-none`、用 `-nostdlibinc`、`CompileFlags.Remove` 用 **D7 那张具体黑名单**）——**这是内核特化差异化的落点**；**禁止通配 `-W*`**（会连 `-Wall -Wextra` 一起删掉，告警诊断全丢）；语言服务必须用 `clangd-16`（D18）。LSP 的编辑器交互不在引擎侧（D17）
 - **验收**：P2-2（构建产出 `refkernel.elf`）、P2-6（**负样本**：故意语法错误 → `diagnostic` 带正确 `file`/`line`）、工具链缺失路径 → `E_TOOLCHAIN_MISSING`
 - **注意**：编译数据库条目用 `arguments` 而非 `command`；`directory` 用**绝对路径**（D8）
 
@@ -120,6 +120,12 @@ cd /root/PrincessIDE && DSH_PERMISSION_MODE=danger-full-access \
 - **选型**：若调研 D 结论未落地，先用 `object` + `gimli`，并在报告中标注「选型待复核」
 
 **冲突规则**：三路都依赖 core 类型但**都不得修改 core**。若发现 core 类型不够用，写进交接摘要由主 Agent 裁决，不要各自去改。
+
+**派发节奏（2026-09-11 依实测资源状况裁决）**：**不要三路同时开跑编译**。
+- 实测背景：本机 4 核 / 无 swap；并行期出现过「可用内存 710Mi、3.1Gi 已用」的紧张状态，同时在跑的有 P3-A 的 Tauri `cargo build`、调研 D 的 `cargo build --release`、以及 QEMU 实例。OOM 计数为 0、PSI 低，属于「紧但可控」。
+- 两个硬理由：① **三路同属一个 Cargo 工作区**，并发 `cargo build` 会在 `target/` 锁上相互阻塞，反而更容易撞工具的超时；② 每个 rustc 进程峰值内存不小，叠加有 OOM 风险，而 **OOM 会静默杀掉别人的构建**，制造「莫名其妙的失败」。
+- **裁决**：**先派 B1（`princess-build`）单独跑完并冻结**，再并行派 B2（`run`）+ B3（`symbol`）。宁可慢，也不要让三路互相踩。若届时内存充裕（可用 > 1.5G），可放宽为三路并行。
+- 所有 Agent 一律 `CARGO_BUILD_JOBS=2` 上限；若出现构建莫名失败，降到 1 重试并如实标注。
 
 ---
 
