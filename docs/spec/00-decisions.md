@@ -172,6 +172,16 @@
   4. 构建「莫名其妙失败」时，**先查 `dmesg | grep -i oom-kill`**，再怀疑代码。
 - **禁止**为此去杀用户的非项目进程（`hermes dashboard`、`claude` 等）——那是越界，不属于项目编排权限。 **[实测]**
 
+## D22 已启用 4G swap（OOM 根治手段）——**D21 的串行规则据此放宽**
+- **做了什么** [实测]：创建 `/swapfile`（**4 GiB**，ext 上 `fallocate` 成功）→ `mkswap` → `swapon` **成功**；已写入 `/etc/fstab`（**重启后仍生效**）；`vm.swappiness` **60 → 20**，持久化于 `/etc/sysctl.d/99-princesside-swap.conf`。
+- **为什么 swappiness 取 20 而非默认 60**：Agent 多数时间在等待、而 rustc 爆发式吃内存；低 swappiness 让内核**优先回收 page cache**、少换出匿名页；同时避免重度换页把 **QEMU 基于超时的断言**（如 P2-7 的 `reason=timeout`）变成偶发失败。4G swap 仍为极端情况兜底，**不会再像之前那样直接 OOM**。
+- **D21 据此放宽为**：
+  1. 允许**最多 2 路**重型构建并发（不再严格串行）；**仍禁止 3 路以上**。
+  2. `CARGO_BUILD_JOBS` 上限回到 **2**；`make` 仍 `-j2`。
+  3. `free -h` 预检保留，阈值由 1.2G **放宽到 800Mi**（有 swap 兜底）。
+  4. 其余不变：构建莫名失败**先查 `dmesg | grep -i oom-kill`**；**仍禁止**杀用户的非项目进程。
+- **注意**：swap **只防 OOM、不提升速度**。若 `vmstat 1` 见到 `si/so` 持续非零（明显换页），应主动降到 1 路构建。
+
 ---
 
 ## 开放待办（Open Actions）
