@@ -104,6 +104,17 @@
 - 大型源码编译优先级最低：能拿二进制包就不要源码编译（例如 GDB 新版优先从 apt/backports 解包）。 **[实测]**
 - 证据：5 Agent 并行时 load 3.50、可用内存 1.7G、`Swap: 0B`；调研 C 当时正在 `make -j3 all-gdb`（已提醒降到 `-j2` 并设时间盒）。
 
+## D17 LSP 分工：引擎管「内核特化配置」，前端管「编辑器交互」
+- **决策**：
+  - **引擎侧（Rust）**负责 clangd 的**工程配置生成与校验**（`.clangd`：triple 写死、`-nostdlibinc`、`CompileFlags.Remove` 清理 gcc 专用 flag；`compile_commands.json` 的生成与校验）——这是**内核特化**的部分，也是我们真正的差异化，**可无头机器化验收**。
+  - **前端侧（TS）**用**成熟的 LSP 客户端库**（CodeMirror 6 的 `lsp-client` 或 Monaco 的 `monaco-languageclient`）做编辑器交互（补全/跳转/悬停/诊断 UI），经 Tauri 传输桥接本地 clangd 进程。
+- **理由**：我们的差异化不在重造 LSP 协议栈。在 Rust 里自实现一遍 JSON-RPC/LSP 能力协商是纯成本，且前端侧同样能用 vitest 无头验证。 **[裁决]**
+- **影响**：
+  - **不新建** `crates/princess-lsp`。
+  - `.clangd` 与 `compile_commands.json` 的生成归 **`crates/princess-build`（P2-B/B1）**。
+  - **P3 及以后的前端 LSP 工作不得在 Rust 侧重写协议栈**；若发现成熟库不够用，先写进交接摘要由主 Agent 裁决。
+- **状态**：已通知 P3-A（防止其正在做的语言服务接入方向走偏）。
+
 ---
 
 ## 开放待办（Open Actions）

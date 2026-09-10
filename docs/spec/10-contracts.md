@@ -33,7 +33,11 @@
 | `scripts/` | P0 | 环境、冒烟、符号化脚本 |
 | `docs/spec/` | 主 Agent | 规格与契约 |
 | `docs/research/` | 研究 Agent | 调研报告 |
-| `docs/reports/` | 各阶段 | 验收报告 |
+| `docs/reports/` | 各阶段 | 验收报告（与主 Agent 的复核报告分开） |
+| `Cargo.toml` / `rust-toolchain.toml` / `.cargo/` | P2-A | 根 Cargo 工作区定义 |
+| `package.json` / `pnpm-workspace.yaml` / `pnpm-lock.yaml` | P3-A | 前端工作区定义 |
+| `fixtures/events/` | P2-A | 录制的事件夹具（供前端重放验证） |
+| `.clangd` / `compile_commands.json` 的**生成逻辑** | P2-B/B1 | 内核特化配置（见 D7/D17）；LSP 编辑器交互在前端（D17） |
 
 **规则**：一个目录同一时间只有一个所有者。跨目录改动必须由主 Agent 显式授权。
 

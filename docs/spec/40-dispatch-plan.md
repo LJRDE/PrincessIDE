@@ -73,6 +73,7 @@ PrincessIDE：面向 x86_64 操作系统内核开发的 Linux 桌面 IDE（Tauri
   3. `compile_commands.json` 生成：**首选 bear**；bear 不可用时用手写 wrapper shim（D8）
   4. clang/ld/nasm 的**诊断解析** → `build.diagnostic{severity,file,line,col,message,source}`
   5. 构建日志流式回传（`log.append{stream:"build"}`）+ `build.started/finished{artifacts[]}`
+  6. **按 D7/D17 生成并校验内核工程的 `.clangd` 配置**（triple 写死 `--target=x86_64-unknown-none`、用 `-nostdlibinc`、在 `CompileFlags.Remove` 里清掉 clangd 会报错的 gcc 专用 flag）——**这是内核特化差异化的落点**；LSP 的编辑器交互不在引擎侧（D17）
 - **验收**：P2-2（构建产出 `refkernel.elf`）、P2-6（**负样本**：故意语法错误 → `diagnostic` 带正确 `file`/`line`）、工具链缺失路径 → `E_TOOLCHAIN_MISSING`
 - **注意**：编译数据库条目用 `arguments` 而非 `command`；`directory` 用**绝对路径**（D8）
 
