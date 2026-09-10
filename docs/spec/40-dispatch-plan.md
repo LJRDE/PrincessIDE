@@ -64,6 +64,7 @@ cd /root/PrincessIDE && DSH_PERMISSION_MODE=danger-full-access \
 **代价与纪律**：
 - headless 任务**无法中途 steering、无自动完成通知** → 任务书必须一次给足，且**要求 Agent 把进度与最终报告写进文件**（放 `docs/reports/` 或 `.scratch/`），我靠轮询文件与 job 输出来收活。
 - **每次 headless = 一个 Node 进程 + 一个 Agent**；配合 D16，**同时最多 2~3 个**，重活错开。
+- ⚠️ **QEMU 必须保证被杀干净（实测踩过）**：本工作区出现过**父进程已死、PPID=1 的孤儿 `qemu-system-x86_64` 持续空转**的情况。所有启动 QEMU 的脚本与命令必须：① 用 `timeout` 包裹；② 结束前按**进程组**收尾（`kill -- -$PGID` 或 `pkill -f` 精确匹配），不能只杀父进程。**理由是它会直接污染验收**：P2-7 断言「超时后 `pgrep qemu-system-x86_64` 必须为空」，一个别人的孤儿进程就能让该断言假失败或假通过。主 Agent 复核前也应先清理孤儿。
 
 ---
 
