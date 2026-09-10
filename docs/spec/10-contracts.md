@@ -75,6 +75,8 @@
 | `symbols.indexed` | `artifact`、`buildId`、`symbolCount` |
 | `artifact.changed` | `path`、`kind` —— 触发 hex/ELF/反汇编视图刷新 |
 | `ai.chunk` / `ai.finished` | `requestId`、`text` / `usage` |
+| `lsp.message` | `serverId`、`message`（**已去掉帧头的 JSON-RPC 原文**）。语言服务回包唯一走这条事件流 |
+| `lsp.stopped` | `serverId`、`reason`: `shutdown`\|`crashed`\|`killed` |
 
 ### 流式文本约定
 - 引擎**保证不切断 UTF-8 码点**；非法字节用 `utf8-lossy` 标记并替换。
@@ -85,7 +87,7 @@
 
 ## 3. IPC 命令契约
 
-命名：`princess:<domain>:<action>`，domain ∈ `project` `build` `run` `debug` `symbols` `bin` `fs` `tools` `ai` `op`。
+命名：`princess:<domain>:<action>`，domain ∈ `project` `build` `run` `debug` `symbols` `bin` `fs` `tools` `ai` `op` `lsp`。
 
 统一返回：
 
@@ -106,6 +108,11 @@
 - `princess:debug:attach` / `setBreakpoints` / `continue` / `stepOver` / `stepInto` / `stackTrace` / `scopes` / `variables` / `readMemory` / `writeMemory` / `disassemble` / `registers`
 - `princess:op:cancel`（统一取消入口，参数 `opId`）
 - `princess:op:replay`（从 `seq` 重放事件，用于重连 UI）
+- **语言服务桥（D17 裁决，`lsp` 域）**——引擎负责 clangd 进程生命周期与帧封装，前端只做编辑器交互：
+  - `princess:lsp:start` `{ projectRoot }` → `{ serverId, command, args }`（引擎按 **D7** 生成/校验 `.clangd`、按 **D8** 保证 CDB，并按 **D18** 使用 `clangd-16`）
+  - `princess:lsp:send` `{ serverId, message }` → `{}`（`message` 为**不带帧头**的 JSON-RPC 原文，帧封装由引擎负责）
+  - `princess:lsp:stop` `{ serverId }` → `{}`（干净 `shutdown`→`exit`，随后按进程组收尾）
+  - 回包一律走事件流 `lsp.message` / `lsp.stopped`，**不新增第二条传输通道**（贯彻 §0 第 1 条）。
 
 ---
 

@@ -14,8 +14,8 @@
 | **P6** | x86_64 Multiboot2 内核工程模板 | ✅ **完成**（提前于计划） | ✅ 我亲跑 `templates/verify-template.sh` → exit 0、`37 contract field paths present, 0 unknown`、横幅断言通过；脚本自带负样本（改错横幅 → 非零退出） |
 | **调研 A** | clangd 在 freestanding 内核工程上可用 | ✅ 完成 | ✅ 其 §2.4 标题结论被 A1 对抗复核**推翻并已勘误**（`-nostdinc` 不崩溃，只报诊断） |
 | **调研 B** | QEMU 运行编排 + panic 符号化 | ✅ 完成 | ⏳ 部分结论已被 P0/A1 实践印证（GRUB ISO 路径、串口约定） |
-| **P2-A** | Cargo 工作区 + `princess-core` + `princess-cli` | 🔄 进行中 | — |
-| **P3-A** | Tauri 外壳 + GUI 依赖 + 纵向切片 | 🔄 进行中 | — |
+| **P3-A** | Tauri 外壳 + GUI 依赖 + 纵向切片 | ✅ **完成** | ✅ 我亲跑 `check-contract.mjs` → **`result: ALIGNED`**（21 命令 × 三方逐字一致、10 错误码全对）；`pnpm -C apps/desktop test` → **8 文件 / 81 测试全绿**（含真 CodeMirror 编辑器、事件重放 25 项）；`cargo build`/`pnpm build`/pkg-config 6/6 由其报告提供证据 |
+| **P2-A** | Cargo 工作区 + `princess-core` + `princess-cli` | 🔄 进行中（已被 D19 镜像修复解堵，正在真编译） | — |
 | **调研 C** | 调试协议路线（`gdb -i=dap` 能否直接用） | 🔄 进行中 | — |
 | **调研 D** | ELF/反汇编/hex/页表工具选型 | 🔄 进行中 | — |
 | **P5 前置** | 开启分页的内核夹具 + QEMU monitor 样本 | 🔄 进行中（Mimo） | — |
