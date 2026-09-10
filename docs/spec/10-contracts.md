@@ -64,15 +64,15 @@
 |---|---|
 | `log.append` | `stream`: `build`\|`serial.com1`\|`qemu.monitor`\|`gdb.console`\|`ide`；`chunk`；`encoding`: `utf8`\|`utf8-lossy` |
 | `build.started` | `backend`、`toolchainId`、`argv`、`cwd` |
-| `build.diagnostic` | `severity`、`file`、`line`、`col`、`message`、`source`: `clang`\|`ld`\|`nasm` |
-| `build.finished` | `status`: `ok`\|`failed`\|`cancelled`；`exitCode`；`durationMs`；`artifacts[]` = `{path, kind, size, sha256}` |
+| `build.diagnostic` | `severity`、`file`、`line`、`col`、`message`、`source`: `clang`\|`gcc`\|`ld`\|`nasm`（**`gcc` 为增补**：夹具用 GNU gcc，把 gcc 的诊断标成 clang 属于失真） |
+| `build.finished` | `status`: `ok`\|`failed`\|`cancelled`；`exitCode`；`durationMs`；`artifacts[]` = `{path, kind, size, sha256}`（**`artifacts` 可为空数组**：此时由引擎**发现**构建产物，不得硬编码夹具文件名） |
 | `run.started` | `qemuArgv`、`gdbStub`（可为 null） |
-| `run.fault` | `vector`: `#DE`\|`#UD`\|`#PF`\|…；`rip`；`errorCode`；`regs`；`symbolicated?` = `{symbol, file, line}` |
+| `run.fault` | `vector`: `#DE`\|`#UD`\|`#PF`\|…；`rip`: u64（解析后）；**`ripText`**（guest 原始 16 位十六进制文本，**保留原文以便核对，不得只留解析值**）；`errorCode`；`regs`；`symbolicated?` = `{symbol, file, line}` |
 | `run.exited` | `exitCode`；`reason`: `guest-shutdown`\|`triple-fault`\|`timeout`\|`killed`；`uptimeMs` |
 | `debug.stopped` | `reason`: `breakpoint`\|`step`\|`signal`\|`entry`；`threadId`；`frame`；`regs` |
 | `debug.breakpoint.changed` | `id`、`verified`、`location` |
 | `debug.output` | `category`: `console`\|`stdout`\|`stderr`；`text` |
-| `symbols.indexed` | `artifact`、`buildId`、`symbolCount` |
+| `symbols.indexed` | `artifact`、`buildId`（**可为 `null`**：夹具用 `--build-id=none`，**宁可 null 也不得编造**）、`symbolCount` |
 | `artifact.changed` | `path`、`kind` —— 触发 hex/ELF/反汇编视图刷新 |
 | `ai.chunk` / `ai.finished` | `requestId`、`text` / `usage` |
 | `lsp.message` | `serverId`、`message`（**已去掉帧头的 JSON-RPC 原文**）。语言服务回包唯一走这条事件流 |
@@ -138,7 +138,7 @@ compile_commands = "compile_commands.json"   # 供 clangd 使用
 
 [run]
 backend   = "qemu"
-kernel    = "build/kernel.elf"
+kernel    = "build/kernel.elf"   # 可选；省略时引擎取构建产物中的 ELF（与 artifacts 发现一致）
 boot      = "multiboot1"   # multiboot1 | multiboot2 | uefi | raw
 args      = ["-m", "512M", "-serial", "stdio", "-display", "none", "-no-reboot"]
 timeout_ms = 15000
@@ -162,6 +162,8 @@ model    = ""
 ```
 
 约定：相对路径一律相对工程根；`~` 与 `$ENV` 展开由引擎负责；缺失字段用引擎默认值并在 UI 中标注"使用默认值"。
+
+**可选字段的明确语义（增补）**：`[run].kernel` 可省略——省略时引擎回退到构建产物中的 ELF；`[build].artifacts` 为空数组时，引擎**发现**产物而不是报错。**引擎不得硬编码任何夹具文件名**（如 `refkernel.elf`）。
 
 ---
 
