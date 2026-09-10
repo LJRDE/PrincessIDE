@@ -17,8 +17,8 @@
 | **P3-A** | Tauri 外壳 + GUI 依赖 + 纵向切片 | ✅ **完成** | ✅ 我亲跑 `check-contract.mjs` → **`result: ALIGNED`**（21 命令 × 三方逐字一致、10 错误码全对）；`pnpm -C apps/desktop test` → **8 文件 / 81 测试全绿**（含真 CodeMirror 编辑器、事件重放 25 项）；`cargo build`/`pnpm build`/pkg-config 6/6 由其报告提供证据 |
 | **P2-A** | Cargo 工作区 + `princess-core` + `princess-cli` | 🔄 进行中（已被 D19 镜像修复解堵，正在真编译） | — |
 | **调研 C** | 调试协议路线（`gdb -i=dap` 能否直接用） | 🔄 进行中 | — |
-| **调研 D** | ELF/反汇编/hex/页表工具选型 | 🔄 进行中 | — |
-| **P5 前置** | 开启分页的内核夹具 + QEMU monitor 样本 | 🔄 进行中（Mimo） | — |
+| **调研 D** | ELF/反汇编/hex/页表工具选型 | ✅ **完成** | ✅ 报告逐项表态（`object` 0.40.0 / `gimli`+`addr2line` / `iced-x86` 1.21.0），已冻结为 **D20** |
+| **P5 前置** | 开启分页的内核夹具 + QEMU monitor 样本 | 🔄 交付中（报告待出） | 🔍 我已只读抽查：`CR0.PG=1`、`CR3=0x104000`、真实 `#PF @0x400000` 且错误位解码正确；`info-tlb` 1021 行非退化 → **夹具可用** |
 | **P2-B** | `princess-build` / `run` / `symbol` | ⏸ 等 core 冻结 | — |
 | **P2-C** | 全链集成 + 事件夹具 | ⏸ | — |
 | **P4** | 调试器（DAP + 寄存器/内存/栈/反汇编） | ⏸ 等调研 C | — |

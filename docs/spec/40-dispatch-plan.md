@@ -118,7 +118,8 @@ cd /root/PrincessIDE && DSH_PERMISSION_MODE=danger-full-access \
 - **输入**：`SymbolsIndexed` 事件、参考内核 ELF
 - **交付**：ELF 解析、DWARF 行号、符号索引、RIP → `{symbol,file,line}`；`run.fault.symbolicated` 的填充；guest 自己打印的 panic/回溯文本解析
 - **验收**：P2-4（`symbolicated = {symbol:"refkernel_fault_probe", file, line:100}`），且结果必须与 `addr2line` 对同一 RIP 的输出**一致**（golden 对比）
-- **选型**：若调研 D 结论未落地，先用 `object` + `gimli`，并在报告中标注「选型待复核」
+- **选型（已冻结，见 D20，不要再自行比较）**：ELF 解析用 **`object` 0.40.0**；DWARF 与源码行用 **`gimli` 0.34.0 + `addr2line` 0.27.1`**（分层）；**不用** `goblin`/`elf`。反汇编不归你，那是 P5（`iced-x86` 1.21.0）。
+- **UI 含义（D20）**：符号化的结果必须能支撑「反汇编 + 源码行并排」的呈现，因此 `source_line_for_address` 要能同时给出地址区间与行号范围，不要只回一个行号。
 
 **冲突规则**：三路都依赖 core 类型但**都不得修改 core**。若发现 core 类型不够用，写进交接摘要由主 Agent 裁决，不要各自去改。
 

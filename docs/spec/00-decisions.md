@@ -144,6 +144,15 @@
 - **修复验证**：`cargo fetch`（serde + serde_json + tokio full features）**10.7 秒**下完 **31 个 crate**，exit 0；修复前 10 分钟 0 个。
 - **纪律**：任何 Agent 遇到「cargo 构建很久没动静」——**先查 registry 里 `.crate` 数量是否在增长**，再怀疑代码；**禁止**回退 `.cargo/config.toml` 的源替换。 **[实测]**
 
+## D20 二进制/可视化技术栈（依调研 D 的实测结论冻结）
+- **ELF / 目标文件解析** → **`object` 0.40.0**（**明确不用** `goblin`、不用 `elf`）
+- **DWARF 与源码行** → **`gimli` 0.34.0 + `addr2line` 0.27.1**（两者都要，分层使用）
+- **反汇编** → **`iced-x86` 1.21.0** 为主；`capstone` 0.14.0 **仅作多架构备选**
+- **demangle** → `rustc-demangle` 0.1.28 + `cpp_demangle` 0.5.1，按符号前缀分派
+- **对 UI 的硬性含义**：反汇编视图必须**「反汇编 + 源码行」并排呈现**，**不能只给一个行号当结论**（调研 D 实测指出：单看行号会误导）。 **[实测]**
+- 依据：`docs/research/D-binary-lowlevel-tooling.md` §1（逐项结论 + 版本 + 许可证 + 风险）
+- **影响**：B3（`princess-symbol`）与 P5（可视化）一律按此栈实现，不要另起选型。
+
 ---
 
 ## 开放待办（Open Actions）

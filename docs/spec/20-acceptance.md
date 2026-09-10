@@ -22,7 +22,11 @@
 横幅字符串 : PrincessIDE reference kernel booted
 故障符号   : refkernel_fault_probe
 参考内核   : fixtures/refkernel/
+分页夹具   : fixtures/paging-kernel/（横幅 `PrincessIDE paging kernel booted`；分页开启后故意触发 #PF）
+monitor 样本: fixtures/qemu-monitor/（P5-4 用**录制**样本做解析断言，不依赖实时 QEMU）
 ```
+
+> **P4/P5 必须使用分页夹具的理由**：`fixtures/refkernel/` **没有开启分页**（`CR0.PG=0`），此时读非法地址只是物理读、**不产生页故障**。因此「读 `CR3`」「页表逐级解析」「`#PF` 归因」这些验收项**在 refkernel 上无法成立**，必须用 `fixtures/paging-kernel/`。该夹具已实测输出 `CR0.PG=1`、`CR3`、以及 `FAULT_ADDR`/`FAULT_ERROR` 解码后的页故障归因。
 
 ---
 
