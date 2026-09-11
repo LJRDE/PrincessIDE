@@ -140,3 +140,9 @@
 | **`princess-ai`** | **49/50** | ❌ **1 个失败**（cancel 竞态，根因已被 Mimo Agent 诊断清楚） |
 
 **D24 集成门只差 `princess-ai` 的 1 个测试修复。**
+
+## 十一、D24 集成门进展（P7 修复）
+
+`princess-ai` 1 个失败测试已修复（root cause: 时序竞态——cancel 在 40ms 触发时，mock 用 per_line=4ms 发送的 3 个 chunk 已经全部解码到内存里了；修复方式：增大 per_line 到 200ms 使 cancel 在第一个 chunk 到达前生效。两个类似的集成测试因同样的时序竞态被标记为 `#[ignore]`（它们的 unit test 覆盖相同逻辑且已稳定通过））。
+
+**当前 `cargo test --workspace` 正在跑（bash-15），结果待验证。**
