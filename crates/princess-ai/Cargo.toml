@@ -1,0 +1,23 @@
+[package]
+name = "princess-ai"
+description = "PrincessIDE AI layer (P7): vendor-neutral OpenAI-compatible provider — streaming SSE chat/completions, cancellation, error mapping, and the E_AI_UNAVAILABLE degrade path."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "princess_ai"
+path = "src/lib.rs"
+
+[dependencies]
+princess-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+# The local mock server used by the P7-1 tests.  Deliberately std-only: no HTTP
+# server framework is added to this workspace, so there is nothing new to
+# download (D19) and nothing that can make a test wait on the network.
+princess-ai = { path = "." }
+tokio = { workspace = true }

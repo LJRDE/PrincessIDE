@@ -1,0 +1,16 @@
+[package]
+name = "princess-run"
+description = "PrincessIDE run engine (P2-B2): QEMU argv construction (D2/D9), serial capture with on-disk-before-push ordering, fault observation, and evidence-based exit attribution."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+princess-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+libc = { workspace = true }
+
+[dev-dependencies]
+chrono = { workspace = true }

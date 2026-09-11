@@ -341,7 +341,7 @@ CDB 生成原本放在 `execute()` 之后，它自己的 `log.append` 就**尾�
 3. **CDB 失败不致构建失败**（只发 `log.append` 提示）。依据 D17「LSP 不在关键路径」。**若主 Agent 要求 CDB 失败即构建失败，需要改一处。**
 4. **CDB 重跑会 `make clean` 并重建一次**（D18 要求），因此一次 `build` 实际调用 make 两次（第二次在 bear 下）。构建耗时约翻倍（实测 refkernel 0.3s→1.1s）。这是 D18 的直接后果，我没有绕开。
 5. **wrapper shim 用「第二次 make」而非拦截第一次**：shim 需要 `CC` 环境变量，而 `make` 的变量优先级使 `make CC=...` 才可靠；为不改变用户 Makefile 语义，选择 clean 后重建一次。
-6. **`build_env` 强制注入 `CARGO_BUILD_JOBS=1` 与 `MAKEFLAGS=-j1`**：这是 D21 内存纪律在**引擎侧**的落实，但会覆盖用户显式的 `-j`。考虑到本机无 swap，我选择安全优先。**若用户需要并行构建，需要放开这里。**
+6. ~~**`build_env` 强制注入 `CARGO_BUILD_JOBS=1` 与 `MAKEFLAGS=-j1`**~~ **已被 D25 修正（见 §9）**：原实现把开发机内存纪律写进了产品路径。现改为缺省不注入、仅在显式配置时注入。
 7. **`.clangd` 里我加了 `CompilationDatabase: .`**（D7 未要求）。理由是让 clangd 在任意 cwd 下都能找到 `compile_commands.json`。它被 clangd-16 接受，无副作用。
 8. **`events` 的 `artifact.changed` payload 只填 `path` + `kind`**：core 的 `ArtifactChangedPayload` 只有这两个字段（`size`/`sha256` 在 `build.finished.artifacts[]` 里）。我按 core 冻结类型实现，未擅自加字段。
 9. **验收用的 `princess.toml`**：`fixtures/refkernel/` **没有** manifest。为检验「`artifacts = []` → 发现」这条契约，我在**副本**里放了一个最小 manifest（未改只读夹具）。模板自带 manifest，直接用。
@@ -404,3 +404,95 @@ clangd-16 --check=kernel.c --compile-commands-dir="$PWD"; echo "exit=$?"
 | 一切结论有真实输出支撑 | ✅ 本报告每条均附命令与退出码 |
 
 **未安装任何 apt 包**（`E_TOOLCHAIN_MISSING` 的负样本用 symlink farm 模拟，未改系统状态）。
+
+---
+
+## 9. D25 修正：开发机内存纪律不再泄漏进产品行为
+
+> 依据：`docs/spec/00-decisions.md` D25、`docs/spec/10-contracts.md` §4（`[build] jobs` 可选）。
+> 本次只改 `crates/princess-build/`、`docs/reports/p2-build.md`、`.scratch/build/`；**未改** `princess-core`/`docs/spec`（见 §9.4 阻碍说明）。
+
+### 9.1 前后行为对比
+
+| 场景 | 修正前（D21 泄漏） | 修正后（D25） |
+|---|---|---|
+| 未配置 `jobs` | **无条件**写入 `CARGO_BUILD_JOBS=1`；并（在 map 内）写 `MAKEFLAGS=-j1` | **什么都不注入**：`build_env` 返回的 map 里没有这两个键，交给 make/cargo 自行决定 |
+| 用户环境已有 `MAKEFLAGS` / `CARGO_BUILD_JOBS` | `CARGO_BUILD_JOBS` 被无条件**覆盖**为 `1` | **原样保留**：不写键 → 子进程环境在父环境之上做加法（`process.rs` 用 `Command::env`），继承值不被覆盖 |
+| `[build] jobs = N` | 不存在该契约字段 | 注入 `MAKEFLAGS=-jN` 与 `CARGO_BUILD_JOBS=N`，配置优先（`MakeBackend::with_jobs`） |
+| 单线程约束 | 在产品代码里 | 移到**验收脚本自己的环境**（`run-acceptance.sh` 顶部 `export MAKEFLAGS=-j1 CARGO_BUILD_JOBS=1`） |
+
+`build_env` 现在只有三段：D18 的 `PATH`、可选的 `jobs` 注入、`[toolchain]` 的 `CC`/`LD` 覆盖。并行度不再是引擎的默认属性，而是工程的显式选择。
+
+### 9.2 新增/改写的单测（真实输出）
+
+```
+$ CARGO_BUILD_JOBS=1 cargo test -p princess-build -- jobs
+test backend::tests::configured_jobs_are_injected_verbatim ... ok
+test backend::tests::default_jobs_injects_nothing_and_preserves_the_user_environment ... ok
+test backend::tests::unconfigured_jobs_adds_no_keys_at_all ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+# exit 0
+```
+
+- `the_make_plan_uses_the_resolved_driver_and_the_manifest_targets`（原 `backend.rs:1054` 断言「总是 1」的那条）已改为断言缺省 map 里**不含** `CARGO_BUILD_JOBS`/`MAKEFLAGS`。
+- 全量单测：`CARGO_BUILD_JOBS=1 cargo test -p princess-build` → **61 passed / 0 failed**（58 → 61）。
+- `configured_jobs_are_injected_verbatim` 通过 `with_jobs(Some(2))` 设置 `jobs`，断言 `MAKEFLAGS=-j2`、`CARGO_BUILD_JOBS=2`。
+
+### 9.3 验收回归（真实输出）
+
+```
+$ bash .scratch/build/run-acceptance.sh
+PASS  P2-2 status=ok  STATUS=ok
+PASS  P2-2 artifacts[] contains ELF  ARTIFACT=.../refkernel.elf
+PASS  P2-2b status=ok (template)  STATUS=ok
+PASS  P2-2b artifacts[] contains ELF  ARTIFACT=.../kernel.elf
+PASS  P2-6 status=failed  STATUS=failed
+PASS  P2-6 diagnostic file/line/source=gcc  line 101
+PASS  P2-6b E_TOOLCHAIN_MISSING  ERROR_CODE=E_TOOLCHAIN_MISSING
+PASS  P2-6b runnable fix suggested  detail has apt-get install
+PASS  CDB uses arguments, absolute directory  both projects
+PASS  .clangd triple/-nostdlibinc/D7 blacklist, no -W*  generated for both
+PASS  event ordering contract  started->...->finished
+-----
+TOTAL pass=11 fail=0
+# exit 0
+```
+
+原始输出留档：`.scratch/build/acceptance-d25.txt`。
+
+### 9.4 阻碍：`[build] jobs` 的契约字段缺失于 `princess-core`（超出本次授权范围）
+
+契约（§4）与模板（`templates/x86_64-multiboot2/princess.toml`）都已写入 `jobs`，但 `princess_core::config::BuildSection`（`crates/princess-core/src/config.rs:231`）**没有该字段**，且带 `#[serde(deny_unknown_fields)]`。后果：
+
+1. `MakeBackend::for_project` 无法从 `project.config.build` 读取 `jobs`，故 §9.1 里「`[build] jobs = N` 注入 N」目前只能经 `MakeBackend::with_jobs(Some(N))` 触发，**尚未接到 manifest**；即 contract → engine 的最后一跳缺口。
+2. 更严重的是：现在任何**真的写了 `jobs = 4` 的 manifest**（包括 D25 刚改过的模板）会被 core 以 `E_INVALID_CONFIG`（unknown field）拒绝加载——模板已经处于加载不了的状态。实测：
+
+```
+$ ./target/debug/p2b1-e2e .scratch/build/d25-jobs-check --no-cdb   # 该 manifest 含 jobs = 2
+thread 'main' panicked at src/main.rs:24:56:
+load princess.toml: PrincessError { code: InvalidConfig, message: "princess.toml is invalid:
+unknown field `jobs`, expected one of `backend`, `command`, `cwd`, `targets`, `artifacts`,
+`compile_commands`", detail: Some("at line 10: targets = [\"all\"]") }
+# exit 101
+```
+
+（用的检查目录在授权范围 `.scratch/build/d25-jobs-check/` 内，未触碰真实模板。）
+
+按本次纪律「**不得改 `princess-core`**」，我没有越界。请主 Agent（core owner）补上这一处可选字段即可打通；补丁形态：
+
+```rust
+// crates/princess-core/src/config.rs  BuildSection
+/// `[build] jobs`: explicit build parallelism.  `None` = inject nothing.
+#[serde(default, skip_serializing_if = "Option::is_none")]
+pub jobs: Option<u32>,
+// 同步 Default impl：jobs: None,
+```
+
+然后 `MakeBackend::for_project` 里把注释掉的这一行接上即可：
+
+```rust
+backend.jobs = project.config.build.jobs;
+```
+
+`with_jobs` 这个 seam、以及 §9.2 的三条单测都无需再改。
+
