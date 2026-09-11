@@ -175,3 +175,12 @@ WORKSPACE_EXIT=0
 - P2-C 全链集成验收（我亲自跑 `doctor → build → run → symbolicate`）
 - P6 工具链向导剩余功能
 - P8 产品化（打包、文档、冒烟 CI）
+
+## 十二、P3-C 与 P8 已派发（最终两路实现）
+
+| 任务 | 说明 | 状态 |
+|---|---|---|
+| **P3-C** | Tauri ↔ 引擎接线（build/run/debug/lsp 命令实现） | 🔄 运行中（bash-16） |
+| **P8** | 打包 + README + 冒烟 CI | 🔄 运行中（bash-17） |
+
+**P3-C 完成后，PrincessIDE 将从"能看"变为"能用"。**
