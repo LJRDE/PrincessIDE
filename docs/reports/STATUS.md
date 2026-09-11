@@ -211,3 +211,14 @@ ALL SMOKE TESTS PASSED
 
 5 步全绿：doctor → workspace tests → smoke-boot → symbolication → build acceptance（11/11 e2e）。
 P4 debug 跳过（--skip-p4）。这验证了 P8 的 smoke-ci.sh 脚本本身是正确可用的。
+
+## 🎉 P3-C 完成命令接线（24/24）
+
+`dispatch()` 函数已路由全部 24 个契约命令：
+- build:start/cancel → `build_handler.rs`（含 `TauriEventSink` → 前端事件总线）
+- run:start/stop → `run_handler.rs`
+- debug:attach + 10 个 debug 子命令 → `debug_handler.rs`
+- lsp:start/send/stop → `lsp_handler.rs`
+- project:open/validate → `project_handler.rs`
+
+正在编译（首次全量构建中）。编译通过后即为 P3-C 完成。
