@@ -194,3 +194,9 @@ WORKSPACE_EXIT=0
 ## 十四、P2 集成审查完成
 
 主 Agent 独立审查报告已写入 `docs/reports/p2-review.md`：8 个工作区 crate 全部通过（454+ 测试、契约对齐、代码质量约束）。**P2 引擎层可宣布完成。**
+
+## 十五、P8 完成 + P3-C 编译中
+
+**P8 已完成**（README + INSTALL + smoke-ci.sh + packaging scripts），冒烟 CI 正在独立验证。
+
+**P3-C 状态**：引擎 crate 已全部加进 Tauri Cargo.toml，首次全量编译中（target 2.2GB）。尚未开始实现具体 IPC 命令（build:start 等仍为 E_NOT_FOUND）。
