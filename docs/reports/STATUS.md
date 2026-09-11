@@ -190,3 +190,7 @@ WORKSPACE_EXIT=0
 - Tauri `src-tauri/Cargo.toml` 已添加 6 个引擎 crate 作为 path 依赖（`princess-core/build/run/symbol/debug/bin`），Cargo.lock 已更新，`dist/` 产物已生成——说明编译通过。
 - 命令实现（`build:start`/`run:start`/`debug:*`/`lsp:*`）仍在写，尚未完成。
 - A9/P5/P7 三份缺失报告已补齐（主 Agent 基于独立验证证据撰写）。
+
+## 十四、P2 集成审查完成
+
+主 Agent 独立审查报告已写入 `docs/reports/p2-review.md`：8 个工作区 crate 全部通过（454+ 测试、契约对齐、代码质量约束）。**P2 引擎层可宣布完成。**
