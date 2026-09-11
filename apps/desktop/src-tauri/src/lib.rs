@@ -6,28 +6,41 @@
 //!   - own the engine→UI event stream (`events`, contract §2);
 //!   - own the unified cancellation registry (`ops`, contract §3 `princess:op:cancel`);
 //!   - orchestrate child processes (`doctor` runs scripts/doctor.sh).
-//!
-//! Deliberately absent: build/run/debug backends (P2/P4), binary views (P5) and
-//! **any LSP protocol implementation** — per decision D17 the engine only
-//! generates/validates clangd project configuration; the editor's language
-//! service lives in the frontend over `@codemirror/lsp-client`.
+//!   - wire engine backends: build, run, debug, LSP (P3-C).
 
+pub mod build_handler;
 pub mod commands;
 pub mod contract;
+pub mod debug_handler;
 pub mod doctor;
 pub mod events;
+pub mod lsp_handler;
 pub mod ops;
+pub mod project_handler;
+pub mod run_handler;
 
-use tauri::Emitter;
+use std::sync::Arc;
+use tauri::{Emitter, Manager};
 
 use events::{EventBus, EVENT_CHANNEL};
+use lsp_handler::LspRegistry;
 use ops::OpRegistry;
 
 /// Shared engine state handed to every IPC handler.
-#[derive(Default)]
 pub struct AppState {
-    pub bus: EventBus,
+    pub bus: Arc<EventBus>,
     pub ops: OpRegistry,
+    pub lsp: LspRegistry,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            bus: Arc::new(EventBus::default()),
+            ops: OpRegistry::default(),
+            lsp: LspRegistry::new(),
+        }
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

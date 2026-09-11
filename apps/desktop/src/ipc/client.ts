@@ -79,3 +79,33 @@ export const opCancel = (opId: string, invokeFn?: InvokeFn) =>
   call('princess:op:cancel', { opId }, invokeFn);
 export const opReplay = (fromSeq: number, invokeFn?: InvokeFn) =>
   call('princess:op:replay', { fromSeq }, invokeFn);
+
+// P3-C: build commands
+export const buildStart = (args?: { projectRoot?: string; targets?: string[] }, invokeFn?: InvokeFn) =>
+  call('princess:build:start', args ?? {}, invokeFn);
+export const buildCancel = (opId: string, invokeFn?: InvokeFn) =>
+  call('princess:build:cancel', { opId }, invokeFn);
+
+// P3-C: run commands
+export const runStart = (args?: { projectRoot?: string; timeoutMs?: number }, invokeFn?: InvokeFn) =>
+  call('princess:run:start', args ?? {}, invokeFn);
+export const runStop = (opId: string, invokeFn?: InvokeFn) =>
+  call('princess:run:stop', { opId }, invokeFn);
+
+// P3-C: project commands
+export const projectOpen = (args?: { path?: string }, invokeFn?: InvokeFn) =>
+  call('princess:project:open', args ?? {}, invokeFn);
+export const projectValidate = (args?: { path?: string }, invokeFn?: InvokeFn) =>
+  call('princess:project:validate', args ?? {}, invokeFn);
+
+// P3-C: debug commands
+export const debugAttach = (args?: { host?: string; port?: number; symbols?: string }, invokeFn?: InvokeFn) =>
+  call('princess:debug:attach', args ?? {}, invokeFn);
+
+// P3-C: LSP commands
+export const lspStart = (projectRoot: string, invokeFn?: InvokeFn) =>
+  call('princess:lsp:start', { projectRoot }, invokeFn);
+export const lspSend = (serverId: string, message: string, invokeFn?: InvokeFn) =>
+  call('princess:lsp:send', { serverId, message }, invokeFn);
+export const lspStop = (serverId: string, invokeFn?: InvokeFn) =>
+  call('princess:lsp:stop', { serverId }, invokeFn);

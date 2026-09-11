@@ -71,6 +71,32 @@ impl EventBus {
         let ring = self.ring.lock().expect("event ring poisoned");
         ring.iter().filter(|e| e["seq"].as_u64().unwrap_or(0) >= from_seq).cloned().collect()
     }
+
+    /// Build an envelope from an engine `EventBody`.
+    ///
+    /// The engine crate defines `EventBody` (an enum of all v1 event kinds) and
+    /// provides `to_ndjson()` on `Event` which produces the contract envelope.
+    /// This method uses the engine's own serialization so the shape is always
+    /// consistent with the contract.
+    pub fn envelope_from_body(&self, body: princess_core::event::EventBody, op_id: Option<&str>) -> Value {
+        let seq = self.seq.fetch_add(1, Ordering::SeqCst) + 1;
+        let ts = now_iso8601();
+        let event = princess_core::event::Event::new(
+            seq,
+            parse_timestamp(&ts),
+            op_id.map(String::from),
+            body,
+        );
+        let json_str = event.to_ndjson().unwrap_or_default();
+        // Parse back to Value so we can record in the ring and emit.
+        let env: Value = serde_json::from_str(json_str.trim()).unwrap_or_else(|_| json!({}));
+        let mut ring = self.ring.lock().expect("event ring poisoned");
+        if ring.len() == RING_CAPACITY {
+            ring.pop_front();
+        }
+        ring.push_back(env.clone());
+        env
+    }
 }
 
 /// UTC timestamp in the contract's example format: `2026-05-05T12:00:00.123Z`.
@@ -110,6 +136,29 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let d = (doy - (153 * mp + 2) / 5 + 1) as u32; // [1, 31]
     let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
     (if m <= 2 { y + 1 } else { y }, m, d)
+}
+
+/// Parse an ISO 8601 UTC timestamp string into a `chrono::DateTime`.
+///
+/// The engine's `Event::new` takes a `DateTime<Utc>`, so we need to convert
+/// our hand-rolled ISO string to what chrono expects.
+fn parse_timestamp(ts: &str) -> chrono::DateTime<chrono::Utc> {
+    use chrono::TimeZone;
+    // Parse the format "2026-05-05T12:00:00.123Z"
+    let date_part = &ts[0..10];
+    let time_part = &ts[11..23]; // "12:00:00.123"
+    let parts: Vec<&str> = date_part.split('-').collect();
+    let year: i32 = parts[0].parse().unwrap_or(2026);
+    let month: u32 = parts[1].parse().unwrap_or(1);
+    let day: u32 = parts[2].parse().unwrap_or(1);
+    let time_parts: Vec<&str> = time_part.split(':').collect();
+    let hour: u32 = time_parts[0].parse().unwrap_or(0);
+    let min: u32 = time_parts[1].parse().unwrap_or(0);
+    let sec_ms: Vec<&str> = time_parts[2].split('.').collect();
+    let sec: u32 = sec_ms[0].parse().unwrap_or(0);
+    let ms: u32 = sec_ms.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+    chrono::Utc.with_ymd_and_hms(year, month, day, hour, min, sec).unwrap()
+        + chrono::Duration::milliseconds(ms as i64)
 }
 
 #[cfg(test)]

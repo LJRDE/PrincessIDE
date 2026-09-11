@@ -54,7 +54,7 @@ export interface BuildStartedPayload {
 export type DiagnosticSeverity = 'error' | 'warning' | 'note' | 'info' | (string & {});
 
 /** `build.diagnostic.payload.source` (contract §2) — closed set. */
-export type DiagnosticSource = 'clang' | 'ld' | 'nasm';
+export type DiagnosticSource = 'clang' | 'gcc' | 'ld' | 'nasm';
 
 export interface BuildDiagnosticPayload {
   severity: DiagnosticSeverity;
@@ -115,7 +115,7 @@ export interface RunFaultPayload {
 export type RunExitReason = 'guest-shutdown' | 'triple-fault' | 'timeout' | 'killed';
 
 export interface RunExitedPayload {
-  exitCode: number;
+  exitCode: number | null;
   reason: RunExitReason;
   uptimeMs: number;
 }

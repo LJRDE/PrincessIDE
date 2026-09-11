@@ -39,13 +39,35 @@ pub const CONTRACT_COMMANDS: &[&str] = &[
 
 /// Commands this phase actually implements end to end.
 ///
-/// The three `lsp` commands are deliberately **not** here: the D17 amendment
-/// assigns the clangd process and the frame headers to the engine (P2), so in
-/// P3 they must answer `E_NOT_FOUND` + "not implemented yet", never pretend to work.
+/// After P3-C, these include build/start, run/start, project/open,
+/// debug/attach, and lsp/start — the key surface that turns the IDE
+/// from "can display" to "can build and run kernels".
 pub const IMPLEMENTED_COMMANDS: &[&str] = &[
     "princess:tools:detect",
     "princess:op:cancel",
     "princess:op:replay",
+    // P3-C additions
+    "princess:build:start",
+    "princess:build:cancel",
+    "princess:run:start",
+    "princess:run:stop",
+    "princess:project:open",
+    "princess:project:validate",
+    "princess:debug:attach",
+    "princess:debug:setBreakpoints",
+    "princess:debug:continue",
+    "princess:debug:stepOver",
+    "princess:debug:stepInto",
+    "princess:debug:stackTrace",
+    "princess:debug:scopes",
+    "princess:debug:variables",
+    "princess:debug:readMemory",
+    "princess:debug:writeMemory",
+    "princess:debug:disassemble",
+    "princess:debug:registers",
+    "princess:lsp:start",
+    "princess:lsp:send",
+    "princess:lsp:stop",
 ];
 
 /// Error-code closed set (§3).  Adding a code requires changing the contract.

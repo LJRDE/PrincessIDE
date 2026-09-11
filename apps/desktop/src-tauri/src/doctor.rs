@@ -315,7 +315,7 @@ pub async fn run_doctor_with_env(
         command.env(key, value);
     }
 
-    let mut child = command.spawn().map_err(|e| {
+    let child = command.spawn().map_err(|e| {
         IpcFailure::new(
             ErrorCode::Internal,
             "failed to spawn scripts/doctor.sh",

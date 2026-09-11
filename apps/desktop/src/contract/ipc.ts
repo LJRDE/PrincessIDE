@@ -179,11 +179,155 @@ export interface LspStopArgs {
   serverId: string;
 }
 
+// ---------------------------------------------------------------------------
+// P3-C additions: build, run, project, debug command types
+// ---------------------------------------------------------------------------
+
+export interface BuildStartArgs {
+  projectRoot?: string;
+  targets?: string[];
+}
+
+export interface ArtifactRef {
+  path: string;
+  kind: string;
+  size: number;
+  sha256: string;
+}
+
+export interface BuildStartData {
+  status: 'ok' | 'failed' | 'cancelled';
+  exitCode: number | null;
+  durationMs: number;
+  artifacts: ArtifactRef[];
+  compileCommands?: string;
+}
+
+export interface BuildCancelArgs {
+  opId: string;
+}
+
+export interface BuildCancelData {
+  opId: string;
+  cancelled: boolean;
+}
+
+export interface RunStartArgs {
+  projectRoot?: string;
+  timeoutMs?: number;
+}
+
+export interface RunStartData {
+  exitCode: number | null;
+  reason: string;
+  uptimeMs: number;
+  fault?: {
+    vector: string;
+    rip: number;
+    ripText: string;
+    errorCode: string;
+    symbolicated?: {
+      symbol: string;
+      file: string;
+      line: number;
+    };
+  };
+}
+
+export interface RunStopArgs {
+  opId: string;
+}
+
+export interface RunStopData {
+  opId: string;
+  stopped: boolean;
+}
+
+export interface ProjectOpenArgs {
+  path?: string;
+}
+
+export interface ProjectOpenData {
+  root: string;
+  source: string;
+  isDefault: boolean;
+  schema: number;
+  project: {
+    name: string | null;
+    language: string;
+    arch: string;
+  };
+  build: {
+    backend: string;
+    command: string | null;
+    targets: string[];
+    artifacts: string[];
+  };
+  run: {
+    backend: string;
+    boot: string;
+    timeoutMs: number;
+    args: string[];
+    serial: {
+      device: string;
+      teeToFile: string | null;
+    };
+  };
+  debug: {
+    backend: string;
+    symbols: string | null;
+    stub: {
+      host: string;
+      port: number;
+      mode: string;
+    };
+  };
+}
+
+export interface ProjectValidateArgs {
+  path?: string;
+}
+
+export interface ProjectValidateData {
+  valid: boolean;
+  root: string;
+  name: string;
+  buildable: boolean;
+  source: string;
+  hasMakefile: boolean;
+  hasBuildCommand: boolean;
+  declaredArtifacts: number;
+  targets: string[];
+}
+
+export interface DebugAttachArgs {
+  host?: string;
+  port?: number;
+  symbols?: string;
+}
+
+export interface DebugAttachData {
+  attached: boolean;
+  host: string;
+  port: number;
+  symbols: string;
+  backend: string;
+  protocol: string;
+  note: string;
+}
+
 /** Per-command argument/result typing for the commands P3 exposes end-to-end. */
 export interface IpcMap {
   'princess:tools:detect': { args: Record<string, never>; data: ToolsDetectData };
   'princess:op:cancel': { args: OpCancelArgs; data: OpCancelData };
   'princess:op:replay': { args: OpReplayArgs; data: OpReplayData };
+  'princess:build:start': { args: BuildStartArgs; data: BuildStartData };
+  'princess:build:cancel': { args: BuildCancelArgs; data: BuildCancelData };
+  'princess:run:start': { args: RunStartArgs; data: RunStartData };
+  'princess:run:stop': { args: RunStopArgs; data: RunStopData };
+  'princess:project:open': { args: ProjectOpenArgs; data: ProjectOpenData };
+  'princess:project:validate': { args: ProjectValidateArgs; data: ProjectValidateData };
+  'princess:debug:attach': { args: DebugAttachArgs; data: DebugAttachData };
   'princess:lsp:start': { args: LspStartArgs; data: LspStartData };
   'princess:lsp:send': { args: LspSendArgs; data: Record<string, never> };
   'princess:lsp:stop': { args: LspStopArgs; data: Record<string, never> };

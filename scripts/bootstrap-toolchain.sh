@@ -120,10 +120,16 @@ tar tzdata usr-is-merged util-linux zlib1g
 #     head: symbol lookup error: .../libc.so.6:
 #           undefined symbol: __tunable_is_initialized, version GLIBC_PRIVATE
 GDB16_SUITE="${PRINCESSIDE_GDB16_SUITE:-trixie}"
-GDB16_MIRROR="${PRINCESSIDE_GDB16_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian}"
+GDB16_MIRROR="${PRINCESSIDE_GDB16_MIRROR:-https://mirrors.ustc.edu.cn/debian}"
 GDB16_PKG="${PRINCESSIDE_GDB16_PKG:-gdb}"
 # Prefer an explicit version when more than one candidate ever exists.
 GDB16_MIN_MAJOR="${PRINCESSIDE_GDB16_MIN_MAJOR:-14}"
+
+# Note for users: if you're behind a firewall or have slow access to
+# USTC mirror, override with a local mirror:
+#   PRINCESSIDE_GDB16_MIRROR=https://deb.debian.org/debian  (official, slower)
+#   PRINCESSIDE_GDB16_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian
+# The suite 'trixie' (Debian testing) can also be specified as 'testing'.
 
 # rustup download endpoints.  static.rust-lang.org measured at ~62 B/s from this
 # host (unusable); the Tsinghua mirror measured at ~7 MB/s.  Override with
@@ -770,7 +776,13 @@ download_debs
 extract_debs
 link_qemu_data
 install_bear_launcher
-install_gdb16
+# gdb16 is optional (requires Debian trixie mirror access)
+# If it fails, continue with the rest of the toolchain
+if ! install_gdb16 2>/dev/null; then
+  warn "gdb16 installation failed (network/mirror issue); skipping"
+  warn "P4 debugging feature will not be available until gdb16 is installed"
+  warn "To retry: PRINCESSIDE_GDB16_MIRROR=https://mirrors.ustc.edu.cn/debian bash scripts/bootstrap-toolchain.sh"
+fi
 verify
 
 log "done.  Activate with:  source $ROOT/scripts/env.sh"

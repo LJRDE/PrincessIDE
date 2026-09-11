@@ -34,7 +34,7 @@ pub enum Route {
 
 pub fn classify(cmd: &str) -> Route {
     if IMPLEMENTED_COMMANDS.contains(&cmd) {
-        return Route::Implemented(cmd);
+        return Route::Implemented(IMPLEMENTED_COMMANDS[IMPLEMENTED_COMMANDS.iter().position(|c| *c == cmd).unwrap()]);
     }
     if CONTRACT_COMMANDS.contains(&cmd) {
         return Route::ContractNotImplemented;
@@ -76,6 +76,74 @@ pub async fn dispatch(cmd: &str, args: Value, app: &AppHandle, state: &AppState)
         Route::Implemented("princess:tools:detect") => tools_detect(app, state).await,
         Route::Implemented("princess:op:cancel") => op_cancel(&args, app, state),
         Route::Implemented("princess:op:replay") => op_replay(&args, state),
+        // P3-C: build commands
+        Route::Implemented("princess:build:start") => {
+            crate::build_handler::build_start(&args, app, &state.bus, &state.ops).await
+        }
+        Route::Implemented("princess:build:cancel") => {
+            crate::build_handler::build_cancel(&args, &state.ops)
+        }
+        // P3-C: run commands
+        Route::Implemented("princess:run:start") => {
+            crate::run_handler::run_start(&args, app, &state.bus, &state.ops).await
+        }
+        Route::Implemented("princess:run:stop") => {
+            crate::run_handler::run_stop(&args, &state.ops)
+        }
+        // P3-C: project commands
+        Route::Implemented("princess:project:open") => {
+            crate::project_handler::project_open(&args)
+        }
+        Route::Implemented("princess:project:validate") => {
+            crate::project_handler::project_validate(&args)
+        }
+        // P3-C: debug commands
+        Route::Implemented("princess:debug:attach") => {
+            crate::debug_handler::debug_attach(&args)
+        }
+        Route::Implemented("princess:debug:setBreakpoints") => {
+            crate::debug_handler::debug_set_breakpoints(&args)
+        }
+        Route::Implemented("princess:debug:continue") => {
+            crate::debug_handler::debug_continue(&args)
+        }
+        Route::Implemented("princess:debug:stepOver") => {
+            crate::debug_handler::debug_step_over(&args)
+        }
+        Route::Implemented("princess:debug:stepInto") => {
+            crate::debug_handler::debug_step_into(&args)
+        }
+        Route::Implemented("princess:debug:stackTrace") => {
+            crate::debug_handler::debug_stack_trace(&args)
+        }
+        Route::Implemented("princess:debug:scopes") => {
+            crate::debug_handler::debug_scopes(&args)
+        }
+        Route::Implemented("princess:debug:variables") => {
+            crate::debug_handler::debug_variables(&args)
+        }
+        Route::Implemented("princess:debug:readMemory") => {
+            crate::debug_handler::debug_read_memory(&args)
+        }
+        Route::Implemented("princess:debug:writeMemory") => {
+            crate::debug_handler::debug_write_memory(&args)
+        }
+        Route::Implemented("princess:debug:disassemble") => {
+            crate::debug_handler::debug_disassemble(&args)
+        }
+        Route::Implemented("princess:debug:registers") => {
+            crate::debug_handler::debug_registers(&args)
+        }
+        // P3-C: LSP commands
+        Route::Implemented("princess:lsp:start") => {
+            crate::lsp_handler::lsp_start(&args, app, &state.bus, &state.lsp)
+        }
+        Route::Implemented("princess:lsp:send") => {
+            crate::lsp_handler::lsp_send(&args, &state.lsp)
+        }
+        Route::Implemented("princess:lsp:stop") => {
+            crate::lsp_handler::lsp_stop(&args, app, &state.bus, &state.lsp)
+        }
         Route::Implemented(other) => err(
             ErrorCode::Internal,
             format!("{other} is listed as implemented but has no handler"),
@@ -83,9 +151,9 @@ pub async fn dispatch(cmd: &str, args: Value, app: &AppHandle, state: &AppState)
         ),
         Route::ContractNotImplemented => err(
             ErrorCode::NotFound,
-            format!("{cmd} is not implemented by the P3 shell yet"),
+            format!("{cmd} is not implemented yet"),
             format!(
-                "implemented by P3-A: {}\nremaining §3 commands belong to P2 (project/build/run/lsp), P4 (debug) and P5 (bin/fs) — see docs/spec/10-contracts.md §3",
+                "currently implemented: {}\nsee docs/spec/10-contracts.md §3",
                 IMPLEMENTED_COMMANDS.join(", ")
             ),
         ),
@@ -255,27 +323,27 @@ mod tests {
 
     #[test]
     fn non_contract_names_are_rejected() {
-        // `princess:lsp:bridge` was P3's placeholder before the D17 amendment;
-        // the ratified names are lsp:start / lsp:send / lsp:stop, so the old
-        // placeholder must now be rejected rather than silently accepted.
         for cmd in ["princess:lsp:bridge", "princess:lsp:restart", "princess:tools:detect ", "TOOLS_DETECT", ""] {
             assert_eq!(classify(cmd), Route::Unknown, "{cmd} must not route");
         }
     }
 
     #[test]
-    fn lsp_commands_are_contract_not_implemented_in_p3() {
-        for cmd in ["princess:lsp:start", "princess:lsp:send", "princess:lsp:stop"] {
-            assert_eq!(classify(cmd), Route::ContractNotImplemented, "{cmd}");
+    fn all_v1_commands_are_now_implemented() {
+        // P3-C: all contract commands are implemented.
+        for cmd in CONTRACT_COMMANDS {
+            assert_eq!(classify(cmd), Route::Implemented(cmd), "{cmd} must be implemented");
         }
     }
 
     #[test]
-    fn p3_implements_tools_detect_and_op_cancel_and_op_replay() {
-        assert_eq!(classify("princess:tools:detect"), Route::Implemented("princess:tools:detect"));
-        assert_eq!(classify("princess:op:cancel"), Route::Implemented("princess:op:cancel"));
-        assert_eq!(classify("princess:op:replay"), Route::Implemented("princess:op:replay"));
-        assert_eq!(classify("princess:build:start"), Route::ContractNotImplemented);
-        assert_eq!(classify("princess:debug:attach"), Route::ContractNotImplemented);
+    fn p3_implements_build_and_run_and_lsp_commands() {
+        assert_eq!(classify("princess:build:start"), Route::Implemented("princess:build:start"));
+        assert_eq!(classify("princess:build:cancel"), Route::Implemented("princess:build:cancel"));
+        assert_eq!(classify("princess:run:start"), Route::Implemented("princess:run:start"));
+        assert_eq!(classify("princess:run:stop"), Route::Implemented("princess:run:stop"));
+        assert_eq!(classify("princess:debug:attach"), Route::Implemented("princess:debug:attach"));
+        assert_eq!(classify("princess:lsp:start"), Route::Implemented("princess:lsp:start"));
+        assert_eq!(classify("princess:project:open"), Route::Implemented("princess:project:open"));
     }
 }

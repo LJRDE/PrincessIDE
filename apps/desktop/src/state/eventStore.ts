@@ -66,7 +66,7 @@ export interface RunView {
   startedAt: string;
   running: boolean;
   fault: RunFaultPayload | null;
-  exit: { exitCode: number; reason: RunExitReason; uptimeMs: number } | null;
+  exit: { exitCode: number | null; reason: RunExitReason; uptimeMs: number } | null;
 }
 
 export interface DebugStop extends DebugStoppedPayload {

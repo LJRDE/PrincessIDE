@@ -23,6 +23,24 @@ serde_json = "1"
 tokio = { version = "1", features = ["process", "io-util", "time", "sync", "macros", "rt-multi-thread"] }
 
 # ---------------------------------------------------------------------------
+# Engine crates — path dependencies into the root workspace's crates/.
+#
+# `apps/desktop/src-tauri` is a deliberately independent workspace (see below)
+# so that Tauri's heavy dependency tree does not pollute the engine's
+# `cargo test --workspace`.  The engine crates are brought in as path deps.
+# ---------------------------------------------------------------------------
+princess-core = { path = "../../../crates/princess-core" }
+princess-build = { path = "../../../crates/princess-build" }
+princess-run = { path = "../../../crates/princess-run" }
+princess-symbol = { path = "../../../crates/princess-symbol" }
+princess-debug = { path = "../../../crates/princess-debug" }
+princess-bin = { path = "../../../crates/princess-bin" }
+princess-ai = { path = "../../../crates/princess-ai" }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+toml = "0.8"
+sha2 = "0.10"
+
+# ---------------------------------------------------------------------------
 # Independent cargo workspace (deliberate).
 #
 # `apps/desktop/src-tauri` must NOT be a member of the root workspace owned by

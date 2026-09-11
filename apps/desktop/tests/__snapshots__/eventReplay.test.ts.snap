@@ -98,6 +98,9 @@ rip            0x100abc	0x100abc <refkernel_fault_probe+12>
       "ts": "2026-05-05T13:00:02.900Z",
     },
   ],
+  "lsp": {
+    "servers": {},
+  },
   "modelVersion": 1,
   "needsReplay": false,
   "outOfOrder": 0,
@@ -312,6 +315,9 @@ exports[`replay: refkernel session (build → run → fault → exit) > matches 
       "ts": "2026-05-05T12:00:03.400Z",
     },
   ],
+  "lsp": {
+    "servers": {},
+  },
   "modelVersion": 1,
   "needsReplay": false,
   "outOfOrder": 0,
