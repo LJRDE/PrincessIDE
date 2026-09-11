@@ -200,3 +200,14 @@ WORKSPACE_EXIT=0
 **P8 已完成**（README + INSTALL + smoke-ci.sh + packaging scripts），冒烟 CI 正在独立验证。
 
 **P3-C 状态**：引擎 crate 已全部加进 Tauri Cargo.toml，首次全量编译中（target 2.2GB）。尚未开始实现具体 IPC 命令（build:start 等仍为 E_NOT_FOUND）。
+
+## 🎉 冒烟 CI 全链通过
+
+```
+SMOKE_EXIT=0
+TOTAL pass=11 fail=0
+ALL SMOKE TESTS PASSED
+```
+
+5 步全绿：doctor → workspace tests → smoke-boot → symbolication → build acceptance（11/11 e2e）。
+P4 debug 跳过（--skip-p4）。这验证了 P8 的 smoke-ci.sh 脚本本身是正确可用的。
