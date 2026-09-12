@@ -156,6 +156,96 @@ retry() {
   done
 }
 
+# Parallel download helper: downloads packages in parallel using xargs -P
+# $1 = debs directory (where to download to)
+# $2 = apt options file (optional, for gdb16)
+# $3 = file containing package names (one per line)
+# $4 = log prefix (for error messages)
+# Returns 0 if all packages downloaded successfully, 1 if any failed
+download_parallel() {
+  local debs_dir="$1"
+  local apt_opts_file="$2"
+  local pkg_list_file="$3"
+  local log_prefix="$4"
+  
+  if [ ! -s "$pkg_list_file" ]; then
+    return 0
+  fi
+  
+  local pkg_count
+  pkg_count=$(wc -l < "$pkg_list_file")
+  local jobs="${PRINCESSIDE_DL_JOBS:-8}"
+  
+  log "$log_prefix: downloading $pkg_count package(s) with $jobs parallel jobs"
+  
+  # Create a temporary DIRECTORY to track failures.
+  # Each failing worker touches a file named after its package inside this
+  # directory (e.g.  $fail_dir/badpkg).  This is atomic (no concurrent-write
+  # corruption) and visible to the parent process because the directory path is
+  # passed as a positional argument — unlike a shell variable, a positional arg
+  # survives the xargs -> bash -c boundary.
+  local fail_dir
+  fail_dir=$(mktemp -d)
+  
+  # The download function for each package.
+  # Positional args: $1=pkg $2=debs $3=opts_file $4=log_prefix $5=fail_dir
+  download_single_pkg() {
+    local pkg="$1"
+    local debs="$2"
+    local opts_file="$3"
+    local prefix="$4"
+    local fail_dir="$5"
+    
+    # Check if already cached (idempotency)
+    if [ -n "$(ls "$debs/${pkg}_"*.deb 2>/dev/null | head -n1 || true)" ]; then
+      return 0
+    fi
+    
+    # Build apt-get command
+    local apt_cmd="apt-get"
+    if [ -n "$opts_file" ] && [ -f "$opts_file" ]; then
+      apt_cmd="apt-get $(cat "$opts_file")"
+    fi
+    
+    # Download the package
+    if ( cd "$debs" && retry $apt_cmd download -q \
+           -o APT::Sandbox::User=root \
+           --no-install-recommends "$pkg" >/dev/null 2>&1 ); then
+      return 0
+    else
+      warn "$prefix: could not download $pkg"
+      # Record failure: one file per package — atomic, no flock needed.
+      touch "$fail_dir/$pkg"
+      return 1
+    fi
+  }
+  
+  # Export functions for xargs workers (variables travel as positional args).
+  export -f download_single_pkg warn retry log
+  
+  # Run downloads in parallel.  $fail_dir is passed as the 5th positional arg
+  # so every worker can see it — a positional arg crosses the
+  # xargs -> bash -c boundary, whereas a shell variable does not.
+  cat "$pkg_list_file" | xargs -P "$jobs" -I {} bash -c \
+    'download_single_pkg "$@"' _ {} "$debs_dir" "$apt_opts_file" "$log_prefix" "$fail_dir" \
+    || true
+  
+  # Count failures: number of files in fail_dir = number of failed packages.
+  local fail_count=0
+  if [ -n "$(ls -A "$fail_dir" 2>/dev/null)" ]; then
+    fail_count=$(ls -1 "$fail_dir" | wc -l)
+    warn "$log_prefix: $fail_count package(s) failed to download"
+    for f in "$fail_dir"/*; do
+      [ -e "$f" ] || continue
+      warn "  failed: $(basename "$f")"
+    done
+  fi
+  
+  rm -rf "$fail_dir"
+  
+  return $([ "$fail_count" -eq 0 ] && echo 0 || echo 1)
+}
+
 mkdir -p "$TOOLCHAIN" "$PREFIX" "$DEBCACHE" "$STAMPS" "$RUSTUP_HOME" "$CARGO_HOME"
 
 # =============================================================================
@@ -226,18 +316,18 @@ download_debs() {
     log "deb: nothing to download"
     return 0
   fi
-  log "deb: downloading ${#wanted[@]} package(s) into $DEBCACHE"
-
-  # apt-get download works without dpkg; run it from the cache directory so
-  # archives land in the workspace.  APT::Sandbox::User=root stops apt from
-  # dropping to the unprivileged _apt user, which cannot write into the
-  # workspace and would otherwise emit a warning on every single download.
-  for p in "${wanted[@]}"; do
-    ( cd "$DEBCACHE" && retry apt-get download -q \
-        -o APT::Sandbox::User=root \
-        --no-install-recommends "$p" ) \
-      || warn "could not download $p"
-  done
+  
+  # Write package list to temporary file for parallel download
+  local pkg_list_file
+  pkg_list_file=$(mktemp)
+  printf '%s\n' "${wanted[@]}" > "$pkg_list_file"
+  
+  # Download in parallel (no apt opts file for main toolchain)
+  download_parallel "$DEBCACHE" "" "$pkg_list_file" "deb"
+  local exit_code=$?
+  
+  rm -f "$pkg_list_file"
+  return $exit_code
 }
 
 extract_debs() {
@@ -544,24 +634,25 @@ install_gdb16() {
   if [ "${#missing[@]}" -eq 0 ]; then
     log "gdb16: nothing to download (${#closure[@]} package(s) already cached)"
   else
-    log "gdb16: downloading ${#missing[@]} package(s) into $GDB16_DEBS"
-    # Batch, but not all-or-nothing: apt-get download aborts the entire request
-    # if any single name has no source, and the closure walk can legitimately
-    # contain a name that turns out to be undownloadable.  Asking per package
-    # (as download_debs() above does) costs a few extra apt invocations and can
-    # never lose the rest of the closure to one bad name.
-    local dl=0 dlfail=0
-    for p in "${missing[@]}"; do
-      if ( cd "$GDB16_DEBS" && retry apt-get $(gdb16_apt_opts) download -q \
-             --no-install-recommends "$p" >/dev/null 2>&1 ); then
-        dl=$((dl + 1))
-      else
-        warn "gdb16: could not download $p"
-        dlfail=$((dlfail + 1))
-      fi
-    done
-    log "gdb16: downloaded $dl package(s), $dlfail failed"
-    [ "$dlfail" -eq 0 ] || warn "gdb16: $dlfail package(s) unavailable; the loader check below decides whether that matters"
+    # Write package list to temporary file for parallel download
+    local pkg_list_file
+    pkg_list_file=$(mktemp)
+    printf '%s\n' "${missing[@]}" > "$pkg_list_file"
+    
+    # Create apt options file for gdb16
+    local apt_opts_file
+    apt_opts_file=$(mktemp)
+    gdb16_apt_opts > "$apt_opts_file"
+    
+    # Download in parallel
+    download_parallel "$GDB16_DEBS" "$apt_opts_file" "$pkg_list_file" "gdb16"
+    local exit_code=$?
+    
+    rm -f "$pkg_list_file" "$apt_opts_file"
+    
+    if [ "$exit_code" -ne 0 ]; then
+      warn "gdb16: some packages failed to download; the loader check below decides whether that matters"
+    fi
   fi
 
   # --- unpack, one stamp per archive (idempotent) ----------------------------

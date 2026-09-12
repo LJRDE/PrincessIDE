@@ -195,8 +195,8 @@
       "fix": "用 xargs -P N（默认 8，可用 PRINCESSIDE_DL_JOBS 覆盖）并行下载；保留失败收集与重试；注意每个 worker 写不同 .deb，apt 下载期间只读索引，APT::Sandbox::User=root 避免 _apt 权限问题",
       "acceptance": "同一环境下 bootstrap 总耗时明显下降；下载失败仍能正确报告缺失包名",
       "note": "用户主动提出，属优化非缺陷",
-      "status": "reopened",
-      "resolution": "子 Agent 已改为 xargs -P（PRISSIDE_DL_JOBS 默认 8），但主 Agent 用负样本独立复现出**失败收集失效**：worker 是 bash -c 子进程，fail_file 是父函数 local 变量（export -f 不导出变量）→ 有包下载失败时函数仍返回 0 且不打印失败汇总。已退回重派修复。"
+      "status": "fixed",
+      "resolution": "先由子 Agent 改为 xargs -P（PRINCESSIDE_DL_JOBS 默认 8）；主 Agent 用负样本复现出\"失败收集失效\"（fail_file 是父函数 local，worker 是 bash -c 子进程，export -f 不导出变量 → 有包失败仍 RETURN=0），退回重派。修复后主 Agent 用**两套独立演练台**复验：负样本 1 package(s) failed + RETURN=1；正向 RETURN=0；幂等不再调用 apt-get；并行证据 8 个 START 在 ~18ms 内。演练台留在 .scratch/mimo-tail2/harness/ 可复跑。"
     }
   ],
   "summary": {
