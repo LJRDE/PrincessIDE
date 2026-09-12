@@ -5,19 +5,14 @@
  * Kept dependency-free (no framework) on purpose: P3 is the shell, and the DOM
  * is small enough that a framework would be more surface than value.  All the
  * interesting logic lives in `state/` and `contract/` so it is testable in Node.
+ *
+ * P-A: Layout is now driven by the view registry (`views/registry.ts`).
+ * Each panel self-registers; `app.ts` iterates the registry and mounts them.
+ * This eliminates the BUG-001/002 class of bugs (component exists but is
+ * never mounted) — the registry test asserts every registered testid is in the DOM.
  */
 
-import { createToolTableState, renderToolTable, type ToolTableState } from './components/toolTable.js';
-import {
-  renderDebugPanel as renderEventDebugPanel,
-  renderDiagnostics,
-  renderEventLog,
-  renderEventStatus,
-  renderFaultCard,
-} from './components/eventLog.js';
-import { renderActionPanel, type ActionPanelCallbacks, type DirSelectorFn } from './components/actionPanel.js';
-import { renderDebugPanel, type DebugPanelCallbacks } from './components/debugPanel.js';
-import { createEditor } from './components/editor.js';
+import { listViews, type ViewMountResult } from './views/registry.js';
 import {
   isTauri,
   opReplay,
@@ -33,10 +28,13 @@ import {
   debugStackTrace,
   debugRegisters,
 } from './ipc/client.js';
-import { expectedLanguageService, type ListenFn } from './lsp/client.js';
+import { type ListenFn } from './lsp/client.js';
 import { createInitialState, replayEvents, type IdeState } from './state/eventStore.js';
 import { loadAllBundledFixtures } from './state/fixtureLoader.js';
 import { subscribeToLiveStream, type LiveStreamHandle } from './state/liveStream.js';
+import type { ActionPanelCallbacks, DirSelectorFn } from './components/actionPanel.js';
+import type { DebugPanelCallbacks } from './components/debugPanel.js';
+import type { ToolTableState } from './components/toolTable.js';
 
 export interface AppHandles {
   refreshTools(): Promise<void>;
@@ -76,6 +74,7 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
   root.textContent = '';
   root.className = 'app';
 
+  // --- Top bar (not a registry view — it's the app shell itself) -----------
   const header = document.createElement('header');
   header.className = 'topbar';
   const brand = document.createElement('strong');
@@ -90,6 +89,7 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
   header.append(brand, envChip, refresh);
   root.appendChild(header);
 
+  // --- Grid layout (left / right columns) ---------------------------------
   const grid = document.createElement('div');
   grid.className = 'grid';
   root.appendChild(grid);
@@ -100,134 +100,31 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
   right.className = 'col';
   grid.append(left, right);
 
-  // --- action panel (BUG-001 fix) -------------------------------------------
-  const actionBody = section(left, 'Actions', 'action-panel-section');
-  const actionHost = document.createElement('div');
-  actionBody.appendChild(actionHost);
-
-  // --- toolchain panel -----------------------------------------------------
-  const toolBody = section(left, 'Toolchain (princess:tools:detect)', 'toolchain-panel');
-  const toolHost = document.createElement('div');
-  toolBody.appendChild(toolHost);
-  const toolState: ToolTableState = createToolTableState();
-
-  const refreshTools = async (): Promise<void> => {
-    toolState.loading = true;
-    toolState.error = null;
-    renderToolTable(toolHost, toolState);
-    const res = await toolsDetect();
-    toolState.loading = false;
-    if (res.ok) {
-      toolState.data = res.data;
-      toolState.error = null;
-    } else {
-      toolState.error = res.error;
-      toolState.data = null;
-    }
-    renderToolTable(toolHost, toolState);
-  };
-  refresh.addEventListener('click', () => {
-    void refreshTools();
-  });
-  renderToolTable(toolHost, toolState);
-
-  // --- editor panel --------------------------------------------------------
-  const editorBody = section(left, 'Editor (CodeMirror 6)', 'editor-panel');
-  const editorHost = document.createElement('div');
-  editorHost.className = 'editor-host';
-  editorBody.appendChild(editorHost);
-  const lspNote = document.createElement('p');
-  lspNote.className = 'muted';
-  lspNote.dataset['testid'] = 'lsp-status';
-  // Being explicit beats a bare "no LSP": say which server is expected and why
-  // it is not connected yet (D17 = the engine owns the bridge, D18 = clangd-16).
-  lspNote.textContent = `LSP: not connected · expected ${expectedLanguageService()} · engine-side bridge pending (D17)`;
-  lspNote.dataset['server'] = LANG_SERVICE_ENV_MARKER;
-  editorBody.appendChild(lspNote);
-  const editor = createEditor(editorHost, { filename: 'kernel.c', doc: DEMO_SOURCE });
-
-  // --- event stream panels -------------------------------------------------
-  const eventsBody = section(right, 'Event stream (contract §2)', 'events-panel');
-  const statusBar = document.createElement('div');
-  statusBar.className = 'statusbar';
-  eventsBody.appendChild(statusBar);
-
-  const fixturePicker = document.createElement('select');
-  fixturePicker.dataset['testid'] = 'fixture-picker';
-  const fixtures = loadAllBundledFixtures();
-  for (const f of fixtures) {
-    const opt = document.createElement('option');
-    opt.value = f.name;
-    opt.textContent = `${f.name}${f.constructed ? ' (P3-constructed)' : ''}`;
-    fixturePicker.appendChild(opt);
-  }
-  eventsBody.appendChild(fixturePicker);
-
-  const logHost = document.createElement('div');
-  logHost.className = 'log';
-  eventsBody.appendChild(logHost);
-
-  const faultHost = document.createElement('div');
-  faultHost.className = 'fault-card';
-  eventsBody.appendChild(faultHost);
-
-  const diagHost = document.createElement('div');
-  diagHost.className = 'diagnostics';
-  eventsBody.appendChild(diagHost);
-
-  const debugHost = document.createElement('div');
-  debugHost.className = 'debug-panel';
-  eventsBody.appendChild(debugHost);
-
-  // --- BUG-008: Debug panel (attach/breakpoints/registers/stacktrace) -------
-  const debugPanelBody = section(right, 'Debug (BUG-008)', 'debug-panel-section');
-  const debugPanelHost = document.createElement('div');
-  debugPanelBody.appendChild(debugPanelHost);
-
-  // --- error display (IPC failures, contract §0.4) -------------------------
+  // --- Error display (IPC failures, contract §0.4) -------------------------
   const errorHost = document.createElement('div');
   errorHost.className = 'ipc-errors';
   errorHost.dataset['testid'] = 'ipc-errors';
   root.appendChild(errorHost);
 
-  let state = createInitialState();
+  // --- Mount all registered views ------------------------------------------
+  const views = listViews();
+  const mounted: { view: typeof views[number]; result: ViewMountResult & Record<string, unknown> }[] = [];
 
-  // --- BUG-008: Debug panel callbacks wired to real IPC --------------------
-  const debugCallbacks: DebugPanelCallbacks = {
-    attach: async (args) => {
-      const res = await debugAttach({ host: args.host, port: args.port, symbols: args.symbols });
-      return res;
-    },
-    setBreakpoints: async (breakpoints) => {
-      const res = await debugSetBreakpoints(breakpoints);
-      return res;
-    },
-    continue: async () => {
-      const res = await debugContinue();
-      return res;
-    },
-    stackTrace: async () => {
-      const res = await debugStackTrace();
-      return res;
-    },
-    registers: async () => {
-      const res = await debugRegisters();
-      return res;
-    },
-  };
+  // Column assignment: first 3 views go left, rest go right.
+  const columnMap = [left, left, left, right, right];
 
-  /** Re-render all panels including the action panel. */
-  const render = (): void => {
-    renderEventStatus(statusBar, state);
-    renderEventLog(logHost, state);
-    renderFaultCard(faultHost, state);
-    renderDiagnostics(diagHost, state);
-    renderEventDebugPanel(debugHost, state);
-    renderDebugPanel(debugPanelHost, state, debugCallbacks);
-    renderActionPanel(actionHost, state, actionCallbacks, actionPanelOptions);
-  };
+  for (let i = 0; i < views.length; i++) {
+    const view = views[i];
+    const col = columnMap[i] ?? right;
+    const host = section(col, view.title, view.testid);
+    const result = view.mount(host) as ViewMountResult & Record<string, unknown>;
+    mounted.push({ view, result });
+  }
 
-  // --- Action panel callbacks wired to real IPC ----------------------------
+  // --- Wire up action panel callbacks --------------------------------------
+  const actionMount = mounted.find((m) => m.view.id === 'action-panel');
+  const debugMount = mounted.find((m) => m.view.id === 'debug-panel');
+  const toolchainMount = mounted.find((m) => m.view.id === 'toolchain-panel');
 
   /** Show an IPC error explicitly (contract §0.4: never blank, never silent). */
   const showIpcError = (label: string, err: { code: string; message: string; detail: string }): void => {
@@ -235,9 +132,19 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
     box.className = 'error-box';
     box.textContent = `${label} → ${err.code}: ${err.message}`;
     errorHost.appendChild(box);
-    // Auto-remove after 10 seconds to avoid flooding.
     setTimeout(() => box.remove(), 10_000);
   };
+
+  let state = createInitialState();
+
+  // Live event stream subscription
+  const liveStream: LiveStreamHandle = subscribeToLiveStream(state, {
+    listenFn: options.listenFn,
+    onStateChange: (newState) => {
+      state = newState;
+      render();
+    },
+  });
 
   const actionCallbacks: ActionPanelCallbacks = {
     onBuild: () => {
@@ -279,7 +186,6 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
       });
     },
     onProjectOpen: (path: string) => {
-      // BUG-003: path comes from either the text input or the native dir selector.
       if (!path) {
         showIpcError('princess:project:open', {
           code: 'E_INTERNAL',
@@ -294,46 +200,92 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
     },
   };
 
-  // BUG-003: pass dirSelectorFn to the action panel so the "Browse…" button
-  // is only rendered inside the Tauri shell.
-  const actionPanelOptions = { dirSelectorFn: options.dirSelectorFn };
+  // Wire action panel callbacks
+  if (actionMount) {
+    const r = actionMount.result as Record<string, unknown>;
+    if (typeof r['setCallbacks'] === 'function') {
+      (r['setCallbacks'] as (c: ActionPanelCallbacks) => void)(actionCallbacks);
+    }
+    if (typeof r['setOptions'] === 'function') {
+      (r['setOptions'] as (o: { dirSelectorFn?: DirSelectorFn }) => void)({ dirSelectorFn: options.dirSelectorFn });
+    }
+  }
 
-  // Initial render of the action panel.
-  renderActionPanel(actionHost, state, actionCallbacks, actionPanelOptions);
+  // Wire debug panel callbacks
+  if (debugMount) {
+    const debugCallbacks: DebugPanelCallbacks = {
+      attach: async (args) => debugAttach({ host: args.host, port: args.port, symbols: args.symbols }),
+      setBreakpoints: async (breakpoints) => debugSetBreakpoints(breakpoints),
+      continue: async () => debugContinue(),
+      stackTrace: async () => debugStackTrace(),
+      registers: async () => debugRegisters(),
+    };
+    const r = debugMount.result as Record<string, unknown>;
+    if (typeof r['setCallbacks'] === 'function') {
+      (r['setCallbacks'] as (c: DebugPanelCallbacks) => void)(debugCallbacks);
+    }
+  }
 
-  // --- Live event stream subscription (Task 2) -----------------------------
-
-  // In the Tauri shell, `listen` is available as `window.__TAURI_INTERNALS__`.
-  // We accept an injected listenFn for testability (D17 pattern from lsp/client.ts).
-  const liveStream: LiveStreamHandle = subscribeToLiveStream(state, {
-    listenFn: options.listenFn,
-    onStateChange: (newState) => {
-      state = newState;
-      render();
-    },
+  // --- Toolchain refresh wiring --------------------------------------------
+  const refreshTools = async (): Promise<void> => {
+    if (toolchainMount) {
+      const ts = (toolchainMount.result as Record<string, unknown>)['toolState'] as ToolTableState | undefined;
+      if (ts) {
+        ts.loading = true;
+        ts.error = null;
+        render();
+        const res = await toolsDetect();
+        ts.loading = false;
+        if (res.ok) {
+          ts.data = res.data;
+          ts.error = null;
+        } else {
+          ts.error = res.error;
+          ts.data = null;
+        }
+        render();
+      }
+    }
+  };
+  refresh.addEventListener('click', () => {
+    void refreshTools();
   });
 
+  // --- Render all views ----------------------------------------------------
+  const render = (): void => {
+    for (const { result } of mounted) {
+      result.render(state);
+    }
+  };
+
+  // Initial render (including toolchain panel).
+  render();
+
   // --- Fixture-based offline replay ----------------------------------------
+  // The fixture picker is part of the events-panel view, but the loadFixture
+  // logic lives here because it mutates the shared state.
+  const fixturePicker = root.querySelector('[data-testid="fixture-picker"]') as HTMLSelectElement | null;
+  const fixtures = loadAllBundledFixtures();
 
   const loadFixture = (name: string): void => {
     const fixture = fixtures.find((f) => f.name === name);
     state = fixture ? replayEvents(fixture.events) : createInitialState();
     render();
   };
-  fixturePicker.addEventListener('change', () => loadFixture(fixturePicker.value));
-  // Prefer the reference-kernel session on first paint: it exercises the whole
-  // path a user cares about first (build → run → fault → exit).  Falls back to
-  // whatever fixture the bundle happens to contain.
-  const preferred = fixtures.find((f) => f.name.startsWith('refkernel-session')) ?? fixtures[0];
-  if (preferred) {
-    fixturePicker.value = preferred.name;
-    loadFixture(preferred.name);
-  } else {
-    render();
+
+  if (fixturePicker) {
+    fixturePicker.addEventListener('change', () => loadFixture(fixturePicker.value));
+    const preferred = fixtures.find((f) => f.name.startsWith('refkernel-session')) ?? fixtures[0];
+    if (preferred) {
+      fixturePicker.value = preferred.name;
+      loadFixture(preferred.name);
+    } else {
+      render();
+    }
   }
 
   // `op:replay` is wired to the same UI affordance the live stream will use.
-  statusBar.addEventListener('click', (ev) => {
+  root.addEventListener('click', (ev) => {
     const target = ev.target as HTMLElement;
     if (target.dataset['testid'] === 'request-replay') {
       void opReplay(state.lastSeq + 1).then((res) => {
@@ -341,7 +293,7 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
           const box = document.createElement('div');
           box.className = 'error-box';
           box.textContent = `princess:op:replay → ${res.error.code}: ${res.error.message}`;
-          statusBar.appendChild(box);
+          root.appendChild(box);
         }
       });
     }
@@ -355,19 +307,9 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
     lastRunOpId: () => liveStream.lastRunOpId(),
     destroy: () => {
       liveStream.unsubscribe();
-      editor.destroy();
+      for (const { result } of mounted) {
+        result.destroy?.();
+      }
     },
   };
 }
-
-const LANG_SERVICE_ENV_MARKER = 'PRINCESSIDE_LANG_SERVICE_CLANGD';
-
-const DEMO_SOURCE = `/* PrincessIDE shell demo buffer — fixtures/refkernel/kernel.c shaped.
-   Real files are opened by the engine (princess:project:open, later phase). */
-#include "serial.h"
-
-void kmain(void) {
-    serial_write("PrincessIDE reference kernel booted\\n");
-    refkernel_fault_probe();
-}
-`;

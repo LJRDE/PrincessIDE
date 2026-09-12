@@ -1,0 +1,40 @@
+name: CI Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            curl make gcc binutils python3 \
+            grub-pc-bin grub-common xorriso mtools dpkg \
+            libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libjavascriptcoregtk-4.1-dev libsoup-3.0-dev \
+            librsvg2-dev libayatana-appindicator3-dev \
+            libxdo-dev libssl-dev pkg-config \
+            build-essential file wget
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm -C apps/desktop install --frozen-lockfile || pnpm -C apps/desktop install
+
+      - name: Run CI gate
+        run: bash scripts/ci-gate.sh
