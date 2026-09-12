@@ -430,6 +430,58 @@ P-E1 结束时，若 ①冷启动 / 按键→上屏延迟 / 10 万行滚动帧�
 
 ---
 
+## D31 语言模块层（M13）：Java 作为第一个实例 + 本轮派发的可见性裁决
+
+> 触发：用户要求"添加对 JAVA 的开发支持为新模块"，并明确"优化我的目标、和我确认需求、**这次派的 Agent 我要可见**"。
+
+### D31.1 [裁决] 目标升档表述（用户确认为"语言模块化，Java 第一个实例"）
+
+> **把「语言支持」做成可插拔的一层（M13），Java 是它的第一个实例。**
+
+三条理由（与既有资产咬合）：
+1. **一次性扩张 vs 可复用能力**：硬编码 Java，下一门语言（Kotlin/Rust/C++/Zig —— D4 已留"接口与路线图"）就是又一次全套集成；做成缝，每门语言 = **一个 manifest + 一组适配器 + 一条门**。
+2. **给 M11（声明式插件 + 能力模型）第一个真客户**，否则插件架构一直是纸面设计。
+3. **保住产品身份**：内核路径（C+asm）仍是主路径与参考实现，语言是可选模块，不是产品分叉。
+
+**可验收的强化版目标**：*"一门语言 = 一个 manifest + 一组适配器 + 一条门"*，并用 Java 端到端证明这条缝成立。
+
+### D31.2 [实测] 事实基线
+
+- 本机：`java` / `javac` / `jdb` **在**（`openjdk 17.0.20.1`）；**`jdtls` / `mvn` / `gradle` 不在**；apt 提供 openjdk-17。
+- 仓库**零 Java 痕迹**（唯一命中是 `.toolchain/cargo/registry` 里的第三方源码）。
+- **Java 项目不在 QEMU 里跑** → 现有引擎大半（GRUB/Multiboot2、串口、`#PF` 符号化）对它不适用；Java 模块需要**第二个构建后端（javac）+ 第一个非 clangd 语言服务器（jdtls）+（后置）第二个调试后端（JDWP）**。
+- 本项目验证文化是**夹具驱动**（D3：`refkernel` 是唯一权威夹具、常量不可改）→ Java 模块**必须自带权威夹具与验收**，否则重演 BUG-009（"没有门"的产物）。
+
+### D31.3 [裁决] 新增边界规则（30-modules §二 的 9–11）
+
+9. **语言是模块，不是分叉**：内核路径保持主路径与参考实现；语言模块不得改变内核路径行为与断言常量（D3/D26）。
+10. **语言模块必须自带门**：manifest + 适配器 + **自己的权威夹具与负样本**；没有门的语言模块不许合入。
+11. **语言模块不得自带协议栈**：LSP / 调试一律走既有通道（D17 / D11 同款原则）。
+
+### D31.4 [裁决] 工具链政策（吸取 D6/A1 与 BUG-004/005/006 的教训）
+
+- JDK 用系统现成的，`doctor.sh` 断言 **≥17**；
+- **`jdtls` 必须装进 `.toolchain/` 并由 `doctor.sh` 断言**（含版本与 `E_TOOLCHAIN_MISSING` 修复建议），**不许"顺手依赖系统包"**——否则必然重演"用户装上才发现编译/语言服务失败"。
+
+### D31.5 [裁决] 本轮派发的可见性：**新会话 + `subagent` 直选 Mimo**
+
+- 用户要求"这次派的 Agent 我要可见"。按 **D28.1** 实测：`dsh --profile headless` 是**另起进程的顶层会话**，宿主不登记 → GUI 里结构性不可见；**只有进程内委派**（`subagent` / `subagent_fork` / `workflow`）可见。
+- 用户选择：**新开一个会话**，在新会话里 `subagent` 工具即可**逐次直选 `xiaomi-token-plan-cn/mimo-v2.5-pro`**（D27.2：模型选择只对**新会话**生效；`~/.dsh/settings.yaml` 的 `subagent-model-selection` 已启用并白名单该路由）。**本会话做不到**（工具实例在安装期固定为 disabled）。
+- **代价与义务**：新会话对旧对话**零记忆** → 交接必须走文件（见 `docs/reports/session-handover-2026-09-12.md`），且**旧会话内的未完成项必须在简报里列全**。
+- 若新会话的 `subagent` 仍报 `child model selection is disabled`，回退顺序：`workflow`（逐路 provider/model，可见但前台阻塞）→ 仍不行则 headless（不可见）。
+
+### D31.6 分期
+
+- **P-F0**（先证明缝能容纳现状，**不引入新语言**）：语言模块 manifest + 适配器接口 + 发现/校验；**把现有 C 路径改造成一份 manifest**，既有门全绿；负样本=manifest 缺字段/引用不存在的适配器必须明确报错。
+- **P-F1**（Java 第一版，用户选定：编辑+LSP / javac 构建 / JVM 运行）：jdtls 入 `.toolchain/` + doctor 断言；`fixtures/javaproj/` 权威夹具 + 断言脚本；javac 构建适配器（错误→`build.diagnostic`）；JVM 运行适配器（stdout→既有日志流）；jdtls 经既有 `princess:lsp:*` 接入。门：`cargo test` + `ci-gate.sh` 全绿 + 三条负样本（编译错误必须显示 / jdtls 缺失必须 `E_TOOLCHAIN_MISSING` / 运行非零退出必须如实归因）。
+- **P-F2**（后置）：JDWP 调试后端，独立验收（不能复用 `p4-acceptance.sh`）。
+
+### D31 通用教训
+
+**"加一门语言"和"让语言可插拔"是两件事，成本差在第二门语言之后。** 但可插拔的前提是**缝先能容纳现状**——所以 P-F0 的验收不是"设计了 manifest"，而是"C 路径改造后所有既有门仍然全绿"。
+
+---
+
 ## 开放待办（Open Actions）
 
 | # | 事项 | 归属 | 阻塞谁 |
@@ -445,7 +497,10 @@ P-E1 结束时，若 ①冷启动 / 按键→上屏延迟 / 10 万行滚动帧�
 | A9 | **把 gdb ≥14 提升为一线工具链**：现在它只存在于 `.researchC/dapbin/rootfs` 这个**临时草稿目录**里。需扩展 `scripts/bootstrap-toolchain.sh` 装到 `.toolchain/`、`env.sh` 导出（如 `PRINCESSIDE_DEBUG_GDB`）、`doctor.sh` 断言版本 ≥14。**不完成则 P4 依赖草稿目录，随时可能被清理** | 待派（Mimo） | **P4 全部** |
 | A10 | **修 headless 通道的模型路由**：已完成（D27.1 补记）。做法是给 headless 一份独立 settings 文档（`/root/.dsh/headless-settings.yaml` + headless 补丁里 `settings.config.path`），实测 headless 会话已记录 `xiaomi-token-plan-cn/mimo-v2.5-pro` | ✅ 完成（2026-09-12） | — |
 | A11 | **目视确认委派面板**：用户已确认「面板在」——`princesside-delegation-view` 的宿主半边与浏览器半边均已生效。后续又加了「点击行打开子会话」与「Token 统计（会话/模型/输入/输出/命中率）」两个入口，待用户刷新页面复看 | ✅ 面板确认；新入口待复看 | D27.4 扩展 |
-| A12 | **P-A：门 + 视图注册表**（D29.5 第 1 步）：加 CI（workspace 测试 + 前端 vitest + `check-contract` + `src-tauri` 测试）；前端引入**视图注册表**并把 `app.ts` 收成"布局 + IPC 接线"；补"每个注册视图必须出现在 DOM 里"的测试（BUG-002 的推广） | 待派（用户已批准 D29，未批准开工） | D29 全部后续步骤 |
+| A12 | ~~P-A：门 + 视图注册表~~ **已完成**（`b88b6d3`）：`scripts/ci-gate.sh` + `.github/workflows/ci.yml` + 视图注册表（5 视图自注册、手工 render 归零、124 测试入门）。**门首次全量运行即抓出 `doctor.rs` 两处历史失败**，已修（`c7a19ac`，BUG-009），**门现为 `pass=6 fail=0`** | ✅ 完成（2026-09-12） | — |
 | A13 | **P-B：`princess-bisect` 编排器**（D29.2 ⑥）：`git` CLI 薄封装 + `git bisect run` 接"构建 + QEMU + 断言"；先只读 + 少量写 | 待派 | P5/P7 之后 |
 | A14 | **P-C：声明式插件 + 能力模型**（D29.2 ⑧）：manifest 注册面板/命令/模板；原生插件（WASM/进程 RPC）留最后一期 | 待派 | 插件生态 |
 | A15 | **P-D：补 P5/P7 契约面与前端**：`symbols:`/`bin:`/`ai:` 命令 + 反汇编/页表/hex 视图（D20 要求与源码行并排）+ AI 面板 | 待派 | "已投入未交付"收口 |
+| A16 | **P-F0：语言模块层本体**（D31.6）：manifest + 适配器接口 + 发现/校验；**把现有 C 路径改造成一份 manifest 且既有门全绿**（缝能容纳现状才算数） | 待派（新会话） | P-F1 全部 |
+| A17 | **P-F1：Java 第一版**（编辑+LSP / javac 构建 / JVM 运行）：`jdtls` 入 `.toolchain/` + doctor 断言；`fixtures/javaproj/` 权威夹具；三条负样本 | 待派（新会话） | A16 |
+| A18 | **P-F2：JDWP 调试后端**（后置）：第二个调试协议，独立验收 | 待评估 | — |
