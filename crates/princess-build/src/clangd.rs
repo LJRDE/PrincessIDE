@@ -281,12 +281,67 @@ pub fn validate_dot_clangd(text: &str) -> Result<Vec<String>> {
 }
 
 /// The exact command line the editor must launch for the language service (D18).
+///
+/// This is the legacy version that uses the hardcoded LANG_SERVICE_TOOL constant.
+/// For manifest-based configuration, use [`lang_service_command_from_manifest`].
 pub fn lang_service_command() -> Vec<String> {
     vec![
         LANG_SERVICE_TOOL.to_string(),
         "--background-index".to_string(),
         "--clang-tidy=false".to_string(),
     ]
+}
+
+/// Get the language service command from a manifest file.
+///
+/// This function reads the language manifest and returns the command line
+/// specified in the `[language.lsp]` section. If the manifest cannot be
+/// read or parsed, it falls back to the legacy hardcoded command.
+///
+/// This is part of the M13 language module layer that allows language
+/// support to be configured via manifests rather than hardcoded constants.
+pub fn lang_service_command_from_manifest(manifest_path: &Path) -> Vec<String> {
+    use princess_lang::manifest::LanguageManifest;
+
+    match LanguageManifest::from_file(manifest_path) {
+        Ok(manifest) => {
+            let mut cmd = vec![manifest.lsp.command.clone()];
+            cmd.extend(manifest.lsp.args.clone());
+            cmd
+        }
+        Err(_) => {
+            // Fallback to legacy command if manifest cannot be read
+            lang_service_command()
+        }
+    }
+}
+
+/// Get the language service command from environment variable or manifest.
+///
+/// Priority:
+/// 1. `PRINCESSIDE_LANG_SERVICE_CLANGD` environment variable (D18)
+/// 2. Language manifest (if path provided)
+/// 3. Legacy hardcoded constant
+pub fn lang_service_command_with_fallback(manifest_path: Option<&Path>) -> Vec<String> {
+    // D18: Check environment variable first
+    if let Ok(env_cmd) = std::env::var("PRINCESSIDE_LANG_SERVICE_CLANGD") {
+        if !env_cmd.is_empty() {
+            let mut cmd = vec![env_cmd];
+            cmd.extend([
+                "--background-index".to_string(),
+                "--clang-tidy=false".to_string(),
+            ]);
+            return cmd;
+        }
+    }
+
+    // Try manifest if path provided
+    if let Some(path) = manifest_path {
+        return lang_service_command_from_manifest(path);
+    }
+
+    // Fallback to legacy
+    lang_service_command()
 }
 
 // ------------------------------------------------- compile_commands.json -----

@@ -40,6 +40,7 @@ pub mod artifacts;
 pub mod backend;
 pub mod clangd;
 pub mod diagnostics;
+pub mod manifest;
 pub mod process;
 pub mod toolchain;
 
@@ -50,9 +51,14 @@ pub use backend::{
     DEFAULT_BUILD_TIMEOUT_MS,
 };
 pub use clangd::{
-    compile_commands_usable, lang_service_command, normalise_bear_output, validate_compile_commands,
+    compile_commands_usable, lang_service_command, lang_service_command_from_manifest,
+    lang_service_command_with_fallback, normalise_bear_output, validate_compile_commands,
     validate_dot_clangd, CompileCommand, CompileCommands, DotClangd, WrapperShim, DEFAULT_TRIPLE,
     GCC_ONLY_FLAG_BLACKLIST, GCC_ONLY_FLAGR_BLACKLIST, LANG_SERVICE_TOOL, NOSTD_INCLUDE_FLAG,
+};
+pub use manifest::{
+    lang_service_command_with_fallback as manifest_lang_service_command_with_fallback,
+    should_clean_before_cdb, should_generate_compile_commands, should_generate_dot_clangd,
 };
 pub use diagnostics::{parse_chunk, DiagnosticParser, ParsedDiagnostic, RawDiagnostic};
 pub use process::{
@@ -60,8 +66,8 @@ pub use process::{
     StdioStream, SystemRunner,
 };
 pub use toolchain::{
-    detect_toolchain, kernel_tool_specs, repair_suggestions, ToolRole, ToolSpec, ToolStatus,
-    Toolchain, ToolchainDetector,
+    detect_toolchain, kernel_tool_specs, repair_suggestions, tool_specs_from_manifest, ToolRole,
+    ToolSpec, ToolStatus, Toolchain, ToolchainDetector,
 };
 
 /// The engine's build-event ordering, pinned in one place so the CLI, the Tauri

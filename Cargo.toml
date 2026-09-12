@@ -10,6 +10,7 @@ members = [
     "crates/princess-debug",
     "crates/princess-ai",
     "crates/princess-view",
+    "crates/princess-lang",
 ]
 
 [workspace.package]

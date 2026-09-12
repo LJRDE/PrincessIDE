@@ -188,6 +188,76 @@ pub fn kernel_tool_specs() -> Vec<ToolSpec> {
     ]
 }
 
+/// Get tool specs from a language manifest.
+///
+/// This function reads the manifest and returns the appropriate tool specs.
+/// If the manifest cannot be read, it falls back to the legacy kernel_tool_specs().
+pub fn tool_specs_from_manifest(manifest_path: &std::path::Path) -> Vec<ToolSpec> {
+    use princess_lang::manifest::LanguageManifest;
+
+    match LanguageManifest::from_file(manifest_path) {
+        Ok(manifest) => {
+            let mut specs = vec![
+                ToolSpec::new(
+                    "make",
+                    ToolRole::Driver,
+                    &["make", "gmake"],
+                    &["--version"],
+                    "runs the project's Makefile; without it the make backend cannot build anything",
+                ),
+                ToolSpec::from_owned(
+                    "gcc",
+                    ToolRole::Compiler,
+                    &compiler_candidates(),
+                    &["--version"],
+                    "compiles the C sources (host gcc is fine unless [toolchain] cc pins a cross compiler)",
+                ),
+                ToolSpec::from_owned(
+                    "ld",
+                    ToolRole::Linker,
+                    &linker_candidates(),
+                    &["--version"],
+                    "links the ELF image with the project's linker script",
+                ),
+            ];
+
+            // Add NASM only if the project might need it
+            // (This is a simplification; in reality we'd check the project sources)
+            specs.push(ToolSpec::new(
+                "nasm",
+                ToolRole::Assembler,
+                &["nasm", "yasm"],
+                &["-v"],
+                "assembles .s/.asm sources; only required for projects that list NASM sources",
+            ));
+
+            // Add bear if CDB generation is enabled
+            if manifest.build.cdb_generation {
+                specs.push(ToolSpec::new(
+                    "bear",
+                    ToolRole::CompileDb,
+                    &["bear"],
+                    &["--version"],
+                    "produces compile_commands.json for clangd (D8); the engine has a wrapper-shim fallback",
+                ));
+            }
+
+            // Add language service from manifest
+            let lsp_cmd = manifest.lsp.command.clone();
+            specs.push(ToolSpec::from_owned(
+                &lsp_cmd,
+                ToolRole::LanguageService,
+                &[lsp_cmd.clone()],
+                &["--version"],
+                &format!("the language service specified in manifest ({})", manifest.id),
+            ));
+
+            specs
+        }
+        Err(_) => kernel_tool_specs(),
+    }
+}
+
 /// One resolved — or not resolved — tool.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolStatus {

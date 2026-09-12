@@ -433,6 +433,7 @@ name = "princess-build"
 version = "0.1.0"
 dependencies = [
  "princess-core",
+ "princess-lang",
  "serde",
  "serde_json",
  "sha2",
@@ -464,6 +465,16 @@ name = "princess-debug"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "princess-core",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
+name = "princess-lang"
+version = "0.1.0"
+dependencies = [
  "princess-core",
  "serde",
  "serde_json",

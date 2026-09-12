@@ -8,6 +8,7 @@ license.workspace = true
 
 [dependencies]
 princess-core = { workspace = true }
+princess-lang = { path = "../princess-lang" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
