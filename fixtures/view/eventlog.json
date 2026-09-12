@@ -1,0 +1,63 @@
+{
+  "rows": [
+    {
+      "seq": 1,
+      "ts": "2026-09-10T17:10:26.876Z",
+      "opId": "op-7997",
+      "stream": "ide",
+      "text": "config: no princess.toml in fixtures/refkernel; using Makefile-based engine defaults with target `iso`\n",
+      "lossy": false
+    },
+    {
+      "seq": 2,
+      "ts": "2026-09-10T17:10:26.880Z",
+      "opId": "op-7997",
+      "stream": "ide",
+      "text": "build started: make /usr/bin/make iso",
+      "lossy": false
+    },
+    {
+      "seq": 3,
+      "ts": "2026-09-10T17:10:26.886Z",
+      "opId": "op-7997",
+      "stream": "build",
+      "text": "make: Nothing to be done for 'iso'.\n",
+      "lossy": false
+    },
+    {
+      "seq": 10,
+      "ts": "2026-09-10T17:10:27.636Z",
+      "opId": "op-7997",
+      "stream": "ide",
+      "text": "build finished: status=ok, exit=Some(0), 756ms",
+      "lossy": false
+    },
+    {
+      "seq": 13,
+      "ts": "2026-09-10T17:10:28.855Z",
+      "opId": "op-7997",
+      "stream": "serial.com1",
+      "text": "PrincessIDE reference kernel booted\r\n",
+      "lossy": false
+    },
+    {
+      "seq": 22,
+      "ts": "2026-09-10T17:10:28.863Z",
+      "opId": "op-7997",
+      "stream": "ide",
+      "text": "fault: #UD at RIP 0x0000000000100b3d",
+      "lossy": false,
+      "severity": "error"
+    },
+    {
+      "seq": 29,
+      "ts": "2026-09-10T17:10:42.703Z",
+      "opId": "op-7997",
+      "stream": "ide",
+      "text": "run exited: reason=timeout, exit=Some(0), uptime=15064ms",
+      "lossy": false
+    }
+  ],
+  "totalRows": 7,
+  "offset": 0
+}

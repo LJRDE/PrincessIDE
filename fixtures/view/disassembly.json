@@ -1,0 +1,60 @@
+{
+  "rows": [
+    {
+      "addr": 1051449,
+      "bytes": [85, 72, 137, 229],
+      "mnemonic": "push",
+      "operands": "rbp",
+      "sourceFile": "/root/PrincessIDE/fixtures/refkernel/kernel.c",
+      "sourceLine": 99,
+      "symbol": "refkernel_fault_probe"
+    },
+    {
+      "addr": 1051450,
+      "bytes": [72, 137, 229],
+      "mnemonic": "mov",
+      "operands": "rbp, rsp",
+      "sourceFile": "/root/PrincessIDE/fixtures/refkernel/kernel.c",
+      "sourceLine": 99,
+      "symbol": "refkernel_fault_probe"
+    },
+    {
+      "addr": 1051453,
+      "bytes": [15, 2],
+      "mnemonic": "ud2",
+      "operands": "",
+      "sourceFile": "/root/PrincessIDE/fixtures/refkernel/kernel.c",
+      "sourceLine": 100,
+      "symbol": "refkernel_fault_probe"
+    },
+    {
+      "addr": 1051455,
+      "bytes": [93],
+      "mnemonic": "pop",
+      "operands": "rbp",
+      "sourceFile": "/root/PrincessIDE/fixtures/refkernel/kernel.c",
+      "sourceLine": 101,
+      "symbol": "refkernel_fault_probe"
+    },
+    {
+      "addr": 1051456,
+      "bytes": [195],
+      "mnemonic": "ret",
+      "operands": "",
+      "sourceFile": "/root/PrincessIDE/fixtures/refkernel/kernel.c",
+      "sourceLine": 101,
+      "symbol": "refkernel_fault_probe"
+    },
+    {
+      "addr": 1051457,
+      "bytes": [144],
+      "mnemonic": "nop",
+      "operands": "",
+      "sourceFile": null,
+      "sourceLine": null,
+      "symbol": null
+    }
+  ],
+  "baseAddr": 1051449,
+  "totalInstructions": 6
+}

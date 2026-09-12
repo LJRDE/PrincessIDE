@@ -9,6 +9,7 @@ members = [
     "crates/princess-bin",
     "crates/princess-debug",
     "crates/princess-ai",
+    "crates/princess-view",
 ]
 
 [workspace.package]
