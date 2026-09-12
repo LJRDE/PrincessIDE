@@ -103,6 +103,7 @@
   - `workflow` 仍可用（能逐路指定模型），但它**前台阻塞**，只适合短任务。
   - **不采用的方案**：宿主的 `subagent-model-selection` 设置——它只在插件安装时构建工具 schema，需重启 web 会话才生效，而 headless 通道已完全覆盖需求，故不动用户会话。
   - **并发上限（配合 D16）**：headless 每次运行 = 一个新 Node 进程 + 一个 Agent（约 200~300MB）。本机可用内存约 1.4G，**同时最多 2~3 个 headless 任务**，重活必须错开。
+- **⚠️ 勘误（见 D27）**：本条的「headless 默认跑 Mimo」**已不成立**——`~/.dsh/settings.yaml` 的 `agent-default-model`（用户设置层）会盖掉 profile 补丁层，实测 headless 跑的是 **DeepSeek**；且 `subagent-model-selection` **只对新会话生效**。**派 Mimo 前先读 D27。**
 
 ## D13 环境与权限现状（P0 之后发生变化）
 - 文件沙箱已放开为 **danger-full-access**；**审批提示已关闭**（不要请求提权，直接执行）。
@@ -221,6 +222,71 @@
 
 ---
 
+## D27 更正 D12'（Mimo 路由已失效 / 设置只对新会话生效）+ 新增委派可见性插件
+
+> 触发：用户问"为什么派出去的不是 Mimo"。三条都是本工作区真实命令产出，非推断。
+
+### D27.1 [实测] `dsh --profile headless` 现在跑的是 **DeepSeek**，不是 Mimo
+
+- **做法与产物**：跑 `DSH_PERMISSION_MODE=danger-full-access dsh --profile headless "只回答两个字：可用"` → **exit 0**，回答「可用」；但该次运行的会话 `session-a2fb9cb9-0b12-4a84-93eb-f7794f866d06` 的日志里记录的是
+  `"provider":"deepseek-official"` / `"model":"deepseek-v4-flash-vision-exp"`（各 5 次）。
+- **根因（层级优先序）**：`~/.dsh/settings.yaml` 的 `agent-default-model` 属于**用户设置层**，优先级**高于** profile 的 `cordis.patch.yml` 补丁层，因此 headless profile 里那条 Mimo 覆盖被静默盖掉。
+- **影响**：D12' 表格里「`dsh --profile headless` = Mimo」的假设**不成立**。此前所有以 Mimo 名义发出的 headless 派发，很可能都在消耗 DeepSeek —— 与「DeepSeek 配额告急」互为因果。
+- **修法（已落地，2026-09-12 补记）**：**不给 headless 关行、也不动交互会话的偏好**，而是让 headless 读**自己的** settings 文档——把 `~/.dsh/profiles/headless/cordis.patch.yml` 里 `settings` 行的 `config.path` 指向新建的 `/root/.dsh/headless-settings.yaml`（内含 `agent-default-model: xiaomi-token-plan-cn/mimo-v2.5-pro` 与 `llm-pi-ai.providers.xiaomi-token-plan-cn.apiKeyEnv`）。
+  - 为什么必须带 `llm-pi-ai` 段：它在 `dsh-base` 里是**休眠挂载**（零路由），provider 只能由 settings 文档提供，缺了它 xiaomi 路由根本不注册。
+  - 为什么用独立文档而不是删 `~/.dsh/settings.yaml` 的键：那个键是**用户在 GUI 里选的模型偏好**，删掉会连带改掉交互会话的行为（越界）。
+  - **验证（只看产物）**：`dsh --profile headless "只回答两个字：可用"` → **exit 0**，其会话 `session-a02f12c9-6c78-4808-a621-e01815657cb7` 日志记录 `"provider":"xiaomi-token-plan-cn"` / `"model":"mimo-v2.5-pro"`（各 7 次），**不再是 DeepSeek**。
+  - 回退：删掉 headless 补丁里那个 `- id: settings` 的 config 块，即恢复「读 `~/.dsh/settings.yaml`」的旧行为。
+- **怎么自查（30 秒，仍然适用）**：跑完一次 headless 后，去 `~/.dsh/sessions/<workspace>/<session-id>/session.jsonl.zstd` 里 `zstd -dc | grep -oE '"model":"[^"]+"' | sort -u`。**看产物里的 model id，不要看配置文件。**
+
+### D27.2 [实测] `subagent-model-selection` **只对新会话生效**——D12' 原判断是对的，我在本次会话中的口头判断是错的
+
+- **我先说错、后被实测顶回来**：我读代码后曾下结论"该设置实时采样、不需重启"，并在补丁文件里也这么写了。随后在本会话用 `subagent` 传 `provider`/`model` 实测，直接报
+  **`Error: child model selection is disabled for this tool instance`** —— 参数**被接受**（说明 schema 已刷新）但实例是 disabled。
+- **代码依据**（`dsh-tool-subagent/lib/index.js:586-600`）：`selectForAgent` 在 `ctx.agent` 存在时**在安装期只算一次**并固定；且只有 `freshSession`（`session.firstLiveSeq === 0` 且首事件不是 `session/end-seed`）才会去读设置。**老会话即使重算也仍是 disabled。**
+- **裁决**：**D12' 的原始判断（"需重启 web 会话才生效"）正确**，设置本身有效，但**只对新建会话**可用。已据此改写开放待办 A6。
+- **现状（已配置，待新会话生效）**：`~/.dsh/settings.yaml` 已启用
+  ```yaml
+  subagent-model-selection:
+    enabled: true
+    allowedModels:
+      - provider: xiaomi-token-plan-cn
+        model: mimo-v2.5-pro
+  ```
+  新会话里 `subagent` 工具会带出 `provider`/`model`/`reasoning_effort` 与 `list_subagent_models`，届时才可按 D12' 的"内置 subagent 直选 Mimo"派活。
+
+### D27.3 [实测] Mimo 通道本身是通的（换一条路验证）
+
+- `workflow` 工具支持逐路 `provider`/`model` 覆盖，不受上述门控。实跑一次
+  `provider=xiaomi-token-plan-cn` / `model=mimo-v2.5-pro` → 返回「PrincessIDE Mimo 通道验证成功。」；
+  其子会话 `87123613-d6db-431f-b702-c24c3b7345c5` 的日志记录 `"model":"mimo-v2.5-pro"`，且
+  `origin: subagent`、`delegationDepth: 1`、`parent: session-4a47c0d9-…`。
+- **含义**：凭据（`XIAOMI_TOKEN_PLAN_CN_API_KEY`）与 provider 路由**都没问题**；出问题的只是"哪条通道选中了哪个默认模型"。故 D27.1 是**配置优先级**问题，不是通道故障。
+
+### D27.4 [裁决] 新增插件 `princesside-delegation-view`（委派可见性）
+
+- **动机**：GUI 自带的 `dsh-client-ui-subagent` 能画父子谱系，但它读的 `SessionSummary` **没有模型字段**，所以"这个子 Agent 是 Mimo 还是 DeepSeek 跑的"在界面上看不见。
+- **落点**：宿主半边把 `request/header` / `request/context` 折叠成一个**客户端可见的会话投影** `sessionModel`（`{provider, model, reasoningEffort} | null`）；浏览器半边在 `conversation.session.header.actions` 槽位加「子 Agent (N) ▾」面板，列出 本会话模型 / 本会话的子 Agent / 全部委派（`父 ← 子 → provider/model`）。
+- **位置与接线**：`~/.dsh/profiles/web/node_modules/princesside-delegation-view/`（**仓库外**，与 D25"开发机纪律不进产品代码"同精神）；在 web profile 补丁里以 `- insert:` 挂载（改现有行用 `- id:`，**新增行必须 `- insert:`**）。
+- **生效机制 [实测]**：该 profile `patchReload: live`，保存补丁即**热加载宿主半边**——本会话的投影缓存 `~/.dsh/storages/session_projcache/sessions/session-4a47c0d9-….json` 里出现了 `sessionModel` 行（`{"provider":"deepseek-official","model":"deepseek-v4-flash"}`，seq 递增）即为证；**浏览器半边需刷新页面**才进 roster。
+- **验证（两个独立脚本 + 负样本，退出码即结论）**：
+  ```bash
+  node .scratch/main/verify-plugin.mjs         # 宿主：真会话日志折叠 + 5 个负样本 → exit 0
+  node .scratch/main/verify-plugin-client.mjs  # 浏览器：react-dom/server 真渲染 + 降级路径 → exit 0
+  dsh --profile web --dump-config | grep princesside-delegation-view   # 组合进树
+  dsh --profile headless --patch <overlay> "只回答 ok"                 # 加载 → exit 0
+  #   同一 overlay 指向不存在的包 → ERR_MODULE_NOT_FOUND, exit 1（证明上一条不是假绿）
+  ```
+- **未验证（诚实标注）**：浏览器内**实际视觉**与 roster 是否收录本包。无显示器、且 `/plugins/*` 未登录不可探测（对照实验：现成的 `dsh-client-ui-jobs` 包在未登录下**同样 404**，说明该探测本身无效）。按 D14，GUI 视觉验证归用户。
+
+### D27 通用教训
+
+1. **"配置层写了对的值" ≠ "运行时用了对的值"**。同一件事在 settings 层、profile 补丁层各有取值，还有"何时采样"（安装期 / 首次发布 / 每次请求）这一维；只看配置文件会自我安慰。
+2. **结论要么有产物证据，要么明确标注为推断**。我在 D27.2 上先给了一个只有代码阅读支撑的结论，被一句运行时报错推翻——这正是 D14 要防的事。判据应该是**产物里的 model id**，而不是我读代码的心得。
+3. **无头环境下也要给界面改动设计可自动化的验证**：插件前端无法目视，就用 `react-dom/server` 把组件真渲染出来断言文本与降级路径，把"无法验证"压缩到只剩纯视觉那一小块。
+
+---
+
 ## 开放待办（Open Actions）
 
 | # | 事项 | 归属 | 阻塞谁 |
@@ -230,7 +296,9 @@
 | A3 | 清理废弃草稿（`_work/`、`_toolchain/`、`.researchA/`） | 主 Agent | 无（已 gitignore） |
 | A4 | **P2-B1 重派**（被 OOM 打断、零产出）；随后按 D21 串行派 B2/B3 | 主 Agent | P2 验收 |
 | A5 | 编辑器组件选型复核（P3 已交付，主 Agent 复核） | 主 Agent | P3 收尾 |
-| A6 | ~~开启 `subagent-model-selection`~~ **已不需要**：改用 `dsh --profile headless` 直接路由 Mimo，不占用用户会话 | ✅ 解决 | — |
+| A6 | **开启 `subagent-model-selection`**：已写入 `~/.dsh/settings.yaml`（白名单 `xiaomi-token-plan-cn/mimo-v2.5-pro`）。**但只对新建会话生效**，老会话仍报 `child model selection is disabled for this tool instance`（见 D27.2）。原"改用 headless 直接路由 Mimo"的说法已作废（见 D27.1） | ✅ 配置完成，待新会话验证 | 主 Agent 按 A 路线派 Mimo |
 | A7 | P2-A 收尾：`princess-cli` 实现 + 事件夹具 + P2-6/P2-7 负样本 | P2-A（已唤醒） | P2-C 集成 |
 | A8 | 按 **D21** 复查所有派发命令：重活 `CARGO_BUILD_JOBS=1`、派发前查 `free -h` | 主 Agent | 全部 |
 | A9 | **把 gdb ≥14 提升为一线工具链**：现在它只存在于 `.researchC/dapbin/rootfs` 这个**临时草稿目录**里。需扩展 `scripts/bootstrap-toolchain.sh` 装到 `.toolchain/`、`env.sh` 导出（如 `PRINCESSIDE_DEBUG_GDB`）、`doctor.sh` 断言版本 ≥14。**不完成则 P4 依赖草稿目录，随时可能被清理** | 待派（Mimo） | **P4 全部** |
+| A10 | **修 headless 通道的模型路由**：已完成（D27.1 补记）。做法是给 headless 一份独立 settings 文档（`/root/.dsh/headless-settings.yaml` + headless 补丁里 `settings.config.path`），实测 headless 会话已记录 `xiaomi-token-plan-cn/mimo-v2.5-pro` | ✅ 完成（2026-09-12） | — |
+| A11 | **目视确认委派面板**：用户已确认「面板在」——`princesside-delegation-view` 的宿主半边与浏览器半边均已生效。后续又加了「点击行打开子会话」与「Token 统计（会话/模型/输入/输出/命中率）」两个入口，待用户刷新页面复看 | ✅ 面板确认；新入口待复看 | D27.4 扩展 |
