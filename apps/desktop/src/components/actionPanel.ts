@@ -4,6 +4,13 @@
  * Renders the project controls (Build, Run, Stop) and their live status
  * from the event stream.  Buttons invoke the IPC commands; the state
  * machine (`eventStore.ts`) handles the event feedback.
+ *
+ * BUG-003 (method C): The "Browse…" button uses an injectable
+ * `DirSelectorFn` (D17 pattern from `lsp/client.ts` and `liveStream.ts`)
+ * so that:
+ *   - In Tauri: the real `tauri-plugin-dialog` `open({ directory: true })` is injected.
+ *   - In browser preview: no selector is rendered (only the text input remains).
+ *   - In tests: a fake selector can be injected to exercise both branches.
  */
 
 import type { IdeState } from '../state/eventStore.js';
@@ -19,12 +26,27 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/**
+ * A function that opens a native directory picker and returns the selected
+ * path, or null if the user cancelled.  Injectable for testability (D17).
+ */
+export type DirSelectorFn = () => Promise<string | null>;
+
 export interface ActionPanelCallbacks {
   onBuild?: () => void;
   onRun?: () => void;
   onStopBuild?: () => void;
   onStopRun?: () => void;
-  onProjectOpen?: () => void;
+  onProjectOpen?: (path: string) => void;
+}
+
+export interface ActionPanelOptions {
+  /**
+   * Injected directory selector.  When absent (browser preview), the
+   * "Browse…" button is not rendered — only the text input path entry
+   * is available.
+   */
+  dirSelectorFn?: DirSelectorFn;
 }
 
 /**
@@ -34,22 +56,42 @@ export function renderActionPanel(
   root: HTMLElement,
   state: IdeState,
   callbacks: ActionPanelCallbacks = {},
+  options: ActionPanelOptions = {},
 ): void {
   root.textContent = '';
   root.dataset['testid'] = 'action-panel';
 
-  // Project status
-  // TODO(BUG-003): 待裁决后替换为原生选择器 (tauri-plugin-dialog).
+  // Project status — text input (always rendered, usable in browser preview)
   const projectRow = el('div', 'action-row project-status');
   const projectPathInput = el('input', 'project-path-input');
   projectPathInput.dataset['testid'] = 'project-path-input';
   projectPathInput.setAttribute('type', 'text');
   projectPathInput.setAttribute('placeholder', 'Enter project path…');
   projectRow.appendChild(projectPathInput);
+
+  // BUG-003: "Browse…" button — only when a DirSelectorFn is injected (i.e. Tauri).
+  if (options.dirSelectorFn) {
+    const browseBtn = el('button', 'action-btn browse-btn');
+    browseBtn.dataset['testid'] = 'browse-btn';
+    browseBtn.textContent = '📂 Browse…';
+    browseBtn.addEventListener('click', async () => {
+      const selected = await options.dirSelectorFn!();
+      if (selected !== null) {
+        projectPathInput.value = selected;
+        callbacks.onProjectOpen?.(selected);
+      }
+      // User cancelled → keep current value, no error.
+    });
+    projectRow.appendChild(browseBtn);
+  }
+
   const projectBtn = el('button', 'action-btn project-btn');
   projectBtn.dataset['testid'] = 'project-open-btn';
   projectBtn.textContent = '📂 Open Project';
-  projectBtn.addEventListener('click', () => callbacks.onProjectOpen?.());
+  projectBtn.addEventListener('click', () => {
+    const path = projectPathInput.value?.trim();
+    if (path) callbacks.onProjectOpen?.(path);
+  });
   projectRow.appendChild(projectBtn);
   root.appendChild(projectRow);
 

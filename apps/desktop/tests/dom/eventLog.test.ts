@@ -138,4 +138,63 @@ describe('fault card and diagnostics', () => {
       'fixtures/refkernel/serial.c:27:5 warning [clang] unused parameter \'port\'',
     );
   });
+
+  /**
+   * BUG-007: Prove the diagnostic line is NOT confused with the `serial.com1`
+   * log stream.  The fixlist claimed the diagnostic panel rendered
+   * `/serial.com1:5:27 warning [clang] unused parameter port` — this test
+   * constructs a state with both a `serial.com1` log line AND a
+   * `build.diagnostic`, then asserts:
+   *   1. The diagnostic text is exactly `file:line:col` (not truncated, not
+   *      col:line).
+   *   2. The log panel and the diagnostic panel are independent DOM
+   *      elements — the diagnostic row never contains the stream name
+   *      `serial.com1`.
+   */
+  it('BUG-007: diagnostic rendering does not cross-contaminate with serial.com1 log lines', () => {
+    const mixed = replayEvents([
+      {
+        v: 1, seq: 1, ts: '2026-05-05T12:00:00.000Z', opId: null,
+        kind: 'log.append',
+        payload: { stream: 'serial.com1', chunk: 'PrincessIDE reference kernel booted\n', encoding: 'utf8' },
+      },
+      {
+        v: 1, seq: 2, ts: '2026-05-05T12:00:00.120Z', opId: 'op-7f3a',
+        kind: 'build.started',
+        payload: { backend: 'make', toolchainId: 'host-clang14-nasm', argv: ['make'], cwd: '/root' },
+      },
+      {
+        v: 1, seq: 3, ts: '2026-05-05T12:00:01.100Z', opId: 'op-7f3a',
+        kind: 'build.diagnostic',
+        payload: { severity: 'warning', file: 'fixtures/refkernel/serial.c', line: 27, col: 5, message: "unused parameter 'port'", source: 'clang' },
+      },
+      {
+        v: 1, seq: 4, ts: '2026-05-05T12:00:01.900Z', opId: 'op-7f3a',
+        kind: 'build.finished',
+        payload: { status: 'ok', exitCode: 0, durationMs: 1842, artifacts: [] },
+      },
+    ]);
+
+    // Diagnostic panel
+    const diagHost = document.createElement('div');
+    document.body.appendChild(diagHost);
+    renderDiagnostics(diagHost, mixed);
+    const diagRows = diagHost.querySelectorAll('.diag');
+    expect(diagRows).toHaveLength(1);
+    // Exact text — NOT `serial.com1:5:27`, NOT truncated path
+    expect(diagRows[0]?.textContent).toBe(
+      "fixtures/refkernel/serial.c:27:5 warning [clang] unused parameter 'port'",
+    );
+    // The diagnostic row must not contain the stream name from the log line
+    expect(diagRows[0]?.textContent).not.toContain('serial.com1');
+
+    // Log panel — verify the serial.com1 line rendered correctly there
+    const logHost = document.createElement('div');
+    document.body.appendChild(logHost);
+    renderEventLog(logHost, mixed);
+    const logRows = logHost.querySelectorAll('.log-line');
+    expect(logRows).toHaveLength(1);
+    expect(logRows[0]?.textContent).toContain('[serial.com1]');
+    expect(logRows[0]?.textContent).toContain('PrincessIDE reference kernel booted');
+  });
 });

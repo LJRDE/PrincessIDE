@@ -15,7 +15,7 @@ import {
   renderEventStatus,
   renderFaultCard,
 } from './components/eventLog.js';
-import { renderActionPanel, type ActionPanelCallbacks } from './components/actionPanel.js';
+import { renderActionPanel, type ActionPanelCallbacks, type DirSelectorFn } from './components/actionPanel.js';
 import { createEditor } from './components/editor.js';
 import {
   isTauri,
@@ -59,6 +59,11 @@ function section(root: HTMLElement, title: string, testid: string): HTMLElement 
 export interface MountAppOptions {
   /** Injected Tauri `listen` for the event stream.  Absent = browser preview (degrades silently). */
   listenFn?: ListenFn;
+  /**
+   * Injected directory selector (BUG-003, D17 pattern).  Absent = browser
+   * preview: only the text input path entry is rendered (no "Browse…" button).
+   */
+  dirSelectorFn?: DirSelectorFn;
 }
 
 export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppHandles {
@@ -183,7 +188,7 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
     renderFaultCard(faultHost, state);
     renderDiagnostics(diagHost, state);
     renderDebugPanel(debugHost, state);
-    renderActionPanel(actionHost, state, actionCallbacks);
+    renderActionPanel(actionHost, state, actionCallbacks, actionPanelOptions);
   };
 
   // --- Action panel callbacks wired to real IPC ----------------------------
@@ -237,11 +242,8 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
         if (!res.ok) showIpcError('princess:run:stop', res.error);
       });
     },
-    onProjectOpen: () => {
-      // BUG-003 placeholder: read path from text input.
-      // TODO(BUG-003): 待裁决后替换为原生选择器 (tauri-plugin-dialog).
-      const input = actionHost.querySelector<HTMLInputElement>('[data-testid="project-path-input"]');
-      const path = input?.value?.trim();
+    onProjectOpen: (path: string) => {
+      // BUG-003: path comes from either the text input or the native dir selector.
       if (!path) {
         showIpcError('princess:project:open', {
           code: 'E_INTERNAL',
@@ -256,8 +258,12 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
     },
   };
 
+  // BUG-003: pass dirSelectorFn to the action panel so the "Browse…" button
+  // is only rendered inside the Tauri shell.
+  const actionPanelOptions = { dirSelectorFn: options.dirSelectorFn };
+
   // Initial render of the action panel.
-  renderActionPanel(actionHost, state, actionCallbacks);
+  renderActionPanel(actionHost, state, actionCallbacks, actionPanelOptions);
 
   // --- Live event stream subscription (Task 2) -----------------------------
 
