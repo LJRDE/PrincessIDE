@@ -1,0 +1,172 @@
+{
+  "schema": "princesside.fixlist/v1",
+  "generated": "2026-09-12",
+  "generated_by": "main agent (PrincessIDE 交接)",
+  "verification_basis": "真实命令输出（grep / pkg-config / cargo build / vitest），非 Agent 自述",
+  "context": {
+    "project": "PrincessIDE",
+    "state": "P3-C 引擎接线已完成（24/24 IPC 命令路由），但与 UI 挂载存在缺口",
+    "user_reported": "IDE 窗口能打开、工具链表与事件流正常渲染，但找不到 Open Project 按钮",
+    "env_note": "用户机器 clang 19.1.7 / gcc 14.2.0 / gdb 16.3，比 bootstrap 目标环境（Debian 12: clang 14 / gdb 13.1）更新"
+  },
+  "items": [
+    {
+      "id": "BUG-001",
+      "title": "Open Project / Build / Run 按钮从未挂载到界面",
+      "severity": "critical",
+      "component": "前端 Tauri 外壳",
+      "file": "apps/desktop/src/app.ts",
+      "evidence": "grep -rn \"renderActionPanel\" apps/desktop/src/ 返回空（除 actionPanel.ts 自身定义外无人调用）；app.ts 顶栏仅 header.append(brand, envChip, refresh)",
+      "symptom": "用户界面只有 'detect toolchain' 按钮和夹具下拉框，没有构建/运行/打开工程入口",
+      "fix": "在 app.ts 中 import { renderActionPanel } from './components/actionPanel.js'，新建容器元素并调用它，把 callbacks 接到 ipc/client.ts 的 projectOpen / buildStart / buildCancel / runStart / runStop",
+      "interface": {
+        "callbacks_available": ["onBuild", "onRun", "onStopBuild", "onStopRun", "onProjectOpen"],
+        "testids_rendered": ["action-panel", "project-open-btn", "build-btn"]
+      },
+      "acceptance": "界面出现 Open Project / Build / Run 按钮；点击 Build 后事件流出现真实 build.started → build.finished",
+      "blocks": "用户无法通过 GUI 测试 P3-C 的 24 命令接线"
+    },
+    {
+      "id": "BUG-002",
+      "title": "测试未覆盖 actionPanel 挂载（导致 BUG-001 漏网）",
+      "severity": "high",
+      "component": "前端测试",
+      "file": "apps/desktop/tests/dom/app.test.ts",
+      "evidence": "tests/dom/app.test.ts 的 'mounts every panel' 仅断言 toolchain-panel / editor-panel / events-panel / env / lsp-status / .cm-content，未断言 action-panel",
+      "symptom": "92 个测试全绿，但 actionPanel.ts 是孤儿文件也没被发现",
+      "fix": "在同一测试内补断言：expect(root.querySelector('[data-testid=\"action-panel\"]')).not.toBeNull()，并追加 build-btn / project-open-btn 存在性断言",
+      "acceptance": "删除 app.ts 中的 renderActionPanel 调用后测试必须失败（负样本验证）",
+      "root_cause_note": "组件存在 ≠ 组件被挂载；本项用于防止同类问题复发"
+    },
+    {
+      "id": "BUG-003",
+      "title": "onProjectOpen 缺少工程路径来源",
+      "severity": "high",
+      "component": "前端 / Tauri 依赖",
+      "file": "apps/desktop/src-tauri/Cargo.toml, apps/desktop/package.json",
+      "evidence": "src-tauri/Cargo.toml 依赖仅含 tauri / serde / serde_json / tokio / 引擎 crate / chrono / toml / sha2；未安装 tauri-plugin-dialog",
+      "symptom": "即使按钮挂载，点击 Open Project 也无系统文件选择器可用",
+      "fix": "方案A（推荐）：加 tauri-plugin-dialog（Cargo.toml + package.json + Rust 侧 init），调用 open() 选目录；方案B（快速）：先用文本输入框让用户粘贴路径",
+      "acceptance": "能选择目录并把 projectRoot 传给 princess:project:open，返回 config 解析结果",
+      "decision_required": true
+    },
+    {
+      "id": "BUG-004",
+      "title": "INSTALL.md 缺少 Tauri GUI 系统依赖（WebKitGTK 等）",
+      "severity": "high",
+      "component": "文档",
+      "file": "INSTALL.md",
+      "evidence": "grep -c 'webkit\\|WebKitGTK\\|libgtk' INSTALL.md = 0；第 27 行「安装系统依赖」只列了 curl/make/gcc/binutils/python3/grub-pc-bin/grub-common/xorriso/mtools/dpkg（内核工具链），无任何 GUI 开发库",
+      "symptom": "用户按 INSTALL.md 装完后运行 pnpm tauri dev 会因缺 webkit2gtk-4.1 而编译失败",
+      "fix": "在「安装系统依赖」章节后追加 GUI/桌面依赖小节，包含下列 apt 命令与 pkg-config 验证命令",
+      "required_packages": [
+        "libwebkit2gtk-4.1-dev",
+        "libgtk-3-dev",
+        "libjavascriptcoregtk-4.1-dev",
+        "libsoup-3.0-dev",
+        "librsvg2-dev",
+        "libayatana-appindicator3-dev",
+        "libxdo-dev",
+        "libssl-dev",
+        "pkg-config",
+        "build-essential",
+        "file",
+        "wget",
+        "curl"
+      ],
+      "install_command": "sudo apt-get update -y && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev libssl-dev pkg-config build-essential file wget curl",
+      "verify_command": "pkg-config --modversion webkit2gtk-4.1",
+      "expected_output": "2.50.6（或更高）",
+      "reference": "docs/reports/p3-shell.md §2.2 有完整实测记录（13 个包全部 install ok installed）"
+    },
+    {
+      "id": "BUG-005",
+      "title": "doctor.sh 不检查 GUI 开发库，用户装上后才发现编译失败",
+      "severity": "high",
+      "component": "工具链脚本",
+      "file": "scripts/doctor.sh",
+      "evidence": "grep -c 'webkit\\|gtk\\|pkg-config\\|GUI' scripts/doctor.sh = 0；doctor 只检查命令行工具（cargo/qemu/nasm/clangd/gdb/...）",
+      "symptom": "doctor 报 'all required tools present'，但 pnpm tauri dev 仍会因缺 WebKitGTK 失败",
+      "fix": "在 doctor.sh 中加入 GUI 开发库检查段：对下列 pkg-config 模块逐个 pkg-config --modversion，缺失则报 MISSING 并给出对应 apt 修复命令",
+      "pkg_config_modules_to_check": [
+        { "module": "webkit2gtk-4.1", "pkg": "libwebkit2gtk-4.1-dev", "verified_version_on_ref_host": "2.50.6" },
+        { "module": "gtk+-3.0", "pkg": "libgtk-3-dev", "verified_version_on_ref_host": "3.24.38" },
+        { "module": "javascriptcoregtk-4.1", "pkg": "libjavascriptcoregtk-4.1-dev", "verified_version_on_ref_host": "2.50.6" },
+        { "module": "libsoup-3.0", "pkg": "libsoup-3.0-dev", "verified_version_on_ref_host": "3.2.3" },
+        { "module": "librsvg-2.0", "pkg": "librsvg2-dev", "verified_version_on_ref_host": "2.54.7" }
+      ],
+      "acceptance": "在缺少 WebKitGTK 的环境运行 doctor.sh 必须非零退出并列出缺失包 + apt 修复命令；在具备的环境必须退出 0",
+      "note": "GUI 库属于系统级依赖，bootstrap-toolchain.sh 明确不装系统包，因此只能由 doctor 检测 + 文档指引，不能由 bootstrap 自动安装"
+    },
+    {
+      "id": "BUG-006",
+      "title": "doctor.sh 版本化命名过严，在新发行版上误报缺失",
+      "severity": "medium",
+      "component": "工具链脚本",
+      "file": "scripts/doctor.sh",
+      "evidence": "用户 IDE 截图显示 doctor.sh exit 1，missing: clangd-16 (LSP), clang-16, clangd-14 (legacy), gdb-16.3 (DAP), cmake；但同一截图显示 clang 19.1.7 / clangd 19.1.7 / gdb 16.3 均 ok",
+      "symptom": "用户机器 clang 19 + gdb 16.3 比 bootstrap 目标（clang 14 / gdb 13.1）更新，但 doctor 只认版本化名字（clangd-16 / clang-16 / princess-gdb），因此误报",
+      "fix": "doctor 对每个工具应接受「版本化名字」或「系统名字且版本 >= 最低要求」两种来源，例如 clangd：接受 clangd-16 或 (clangd 且 major >= 16)；gdb：接受 princess-gdb 或 (gdb 且 major >= 14)",
+      "minimum_versions": { "clangd": 16, "gdb": 14 },
+      "acceptance": "在 clang 19 + gdb 16.3 的环境运行 doctor.sh 退出 0（不误报）；在真正缺失的环境仍应报错",
+      "note": "D18 要求语言服务用 clangd-16，但用户系统 clangd 19 完全满足能力要求，不应强制版本化名字"
+    },
+    {
+      "id": "BUG-007",
+      "title": "诊断面板渲染可疑：路径与行列顺序可能错误",
+      "severity": "medium",
+      "component": "前端事件渲染",
+      "file": "apps/desktop/src/components/eventLog.ts",
+      "evidence": "夹具 apps/desktop/fixtures/events/refkernel-session.ndjson 中 build.diagnostic payload 为 {file:'fixtures/refkernel/serial.c', line:27, col:5, message:\"unused parameter 'port'\", source:'clang'}；用户截图的诊断面板显示为 '/serial.com1:5:27 warning [clang] unused parameter port'",
+      "symptom": "路径 fixtures/refkernel/serial.c 显示成 /serial.com1；line:col 27:5 显示成 5:27",
+      "confidence": "medium — 来自 1066x600 缩放截图目视判读，需用户放大确认后再修",
+      "fix": "先由用户放大确认；若属实，检查 eventLog.ts 诊断行的格式化逻辑（路径取字段与 line/col 顺序）",
+      "acceptance": "诊断行渲染为 fixtures/refkernel/serial.c:27:5，且点击可跳转到编辑器对应位置"
+    },
+    {
+      "id": "BUG-008",
+      "title": "调试面板未接线（P4 引擎已完成）",
+      "severity": "low",
+      "component": "前端",
+      "file": "apps/desktop/src/components/eventLog.ts",
+      "evidence": "用户截图 Debug (0 stops) 显示 'no debug session'；princess-debug（5795 行 / 85+ 测试 / 36/36 验收）已完成且 IPC 已路由，但前端无调试面板 UI",
+      "symptom": "无法在 GUI 中设断点/看寄存器/看栈",
+      "fix": "实现调试面板 UI：断点列表、寄存器视图、栈回溯视图、内存/反汇编视图，对接 princess:debug:* 的 12 个命令",
+      "acceptance": "能在 GUI 中对 fixtures/paging-kernel 下断点并看到寄存器与源码级栈回溯",
+      "reference": "docs/HANDOVER.md §7 功能缺口第 1 条"
+    },
+    {
+      "id": "IMPROVE-001",
+      "title": "bootstrap 的 deb 下载是串行的（可多线程加速）",
+      "severity": "low",
+      "component": "工具链脚本",
+      "file": "scripts/bootstrap-toolchain.sh",
+      "evidence": "download_debs() 与 gdb16 下载段均为 for 循环逐个 apt-get download，主工具链 61 个包、gdb16 约 89 个包",
+      "symptom": "受镜像延迟支配，逐个下载耗时远高于带宽所需",
+      "fix": "用 xargs -P N（默认 8，可用 PRINCESSIDE_DL_JOBS 覆盖）并行下载；保留失败收集与重试；注意每个 worker 写不同 .deb，apt 下载期间只读索引，APT::Sandbox::User=root 避免 _apt 权限问题",
+      "acceptance": "同一环境下 bootstrap 总耗时明显下降；下载失败仍能正确报告缺失包名",
+      "note": "用户主动提出，属优化非缺陷"
+    }
+  ],
+  "summary": {
+    "total": 9,
+    "critical": 1,
+    "high": 4,
+    "medium": 2,
+    "low": 2,
+    "by_component": {
+      "前端": 4,
+      "工具链脚本": 3,
+      "文档": 1,
+      "前端测试": 1
+    }
+  },
+  "suggested_order": [
+    "BUG-001 + BUG-002（接线后立即补测试，防止复发）",
+    "BUG-004 + BUG-005（WebKitGTK 双重缺失：文档 + doctor 检测）",
+    "BUG-003（Open Project 的路径选择器）",
+    "BUG-006（doctor 版本命名放宽）",
+    "BUG-007（确认后修诊断渲染）",
+    "BUG-008 / IMPROVE-001"
+  ]
+}
