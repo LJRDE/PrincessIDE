@@ -197,6 +197,19 @@
       "note": "用户主动提出，属优化非缺陷",
       "status": "fixed",
       "resolution": "先由子 Agent 改为 xargs -P（PRINCESSIDE_DL_JOBS 默认 8）；主 Agent 用负样本复现出\"失败收集失效\"（fail_file 是父函数 local，worker 是 bash -c 子进程，export -f 不导出变量 → 有包失败仍 RETURN=0），退回重派。修复后主 Agent 用**两套独立演练台**复验：负样本 1 package(s) failed + RETURN=1；正向 RETURN=0；幂等不再调用 apt-get；并行证据 8 个 START 在 ~18ms 内。演练台留在 .scratch/mimo-tail2/harness/ 可复跑。"
+    },
+    {
+      "id": "BUG-009",
+      "title": "src-tauri doctor.rs 解析缺陷：汇总行被当作工具、MISSING 标记被当作版本",
+      "severity": "medium",
+      "component": "Tauri 外壳 / 工具链面板",
+      "file": "apps/desktop/src-tauri/src/doctor.rs",
+      "evidence": "主 Agent 跑 bash scripts/ci-gate.sh（P-A 新建的门）首次全量运行：src-tauri cargo test 2 failed / 24 passed；missing_names 得到 [clangd-16 (LSP), doctor: 0 tool(s) present,]；nasm.version == Some((required: nasm))",
+      "symptom": "工具链面板会把 doctor.sh 的汇总行显示成一个名为 doctor: 的缺失必需工具，并在 MISSING 行的版本列显示 (required: nasm)",
+      "fix": "解析器结构化拒绝 preamble/汇总行；MISSING 标记不再写入 version；补齐 TOO OLD / NO DAP 状态与 major= 校验形态；夹具按真实 doctor.sh 输出重建；新增 4 条回归测试",
+      "acceptance": "src-tauri cargo test 全绿 + 全量门 pass=6 fail=0",
+      "status": "fixed",
+      "resolution": "修于 c7a19ac。主 Agent 复核：src-tauri 34 passed（原 24 passed / 2 failed）、doctor:: 15 passed（+4 回归）、全量门 pass=6 fail=0。被删的那条 checks 断言是等价替换（bear 与 WRONG VER 仍逐字断言），不是删断言过关。发现方式＝门首次全量运行；该工作区自 bc39fa6 起就红着，因为它是独立 workspace 且无 CI，从未被跑过。"
     }
   ],
   "summary": {

@@ -17,7 +17,7 @@
 | **M6** | **AI** | OpenAI 兼容抽象层 | `crates/princess-ai` | `cargo test -p princess-ai` | 同上（**无契约面**） |
 | **M7** | **夹具与验收** | 权威夹具与断言常量（D3/D26）、验收标准 | `fixtures/**`、`docs/spec/20-acceptance.md`、`scripts/*acceptance*.sh`、`templates/verify-template.sh` | `bash scripts/smoke-ci.sh` + `bash templates/verify-template.sh` | 已有，**但无主人、无版本** |
 | **M8** | **前端外壳 / 视图** | 布局 + IPC 接线 + **视图注册表**（每个视图自注册） | `apps/desktop/src/**` | `pnpm -C apps/desktop exec vitest run` + `tsc --noEmit` + `pnpm build` | 已有；**注册表已落地**（P-A，提交 `b88b6d3`）：5 个视图自注册、`app.ts` 手工 render 调用归零、124 个测试入门 |
-| **M9** | **桌面壳** | Tauri 窗口、24 命令路由、事件桥、capabilities | `apps/desktop/src-tauri/**` | `cargo build` + `cargo test`（在 src-tauri 内，独立工作区） | 已有；**其测试已入门**（`scripts/ci-gate.sh`），**门首次运行即抓出 2 个长期失败**（`doctor.rs` 解析，修复中 `bash-11`） |
+| **M9** | **桌面壳** | Tauri 窗口、24 命令路由、事件桥、capabilities | `apps/desktop/src-tauri/**` | `cargo build` + `cargo test`（在 src-tauri 内，独立工作区） | 已有；**其测试已入门且已转绿**：门首次运行抓出 `doctor.rs` 的 2 个长期失败（`bc39fa6` 起就红），已修（`c7a19ac`）。**全量门 pass=6 fail=0** |
 | **M10** | **编排器**（原"版本控制"） | `git` CLI 薄封装 + `git bisect run` 接"构建 + QEMU + 断言" | 新 crate `crates/princess-bisect` | 新增：bisect 端到端脚本 + 负样本 | **待做（P-B）** |
 | **M11** | **插件管理** | 声明式 manifest（面板 / 命令 / 模板 / 主题）+ 能力模型 | 新 crate + 前端加载器 | 新增：manifest 校验 + 越权拒绝负样本 | **待做（P-C）；原生插件最后** |
 | **M12** | **第二前端渲染后端（可选）** | 与 Web+JS 前端**并列可切换**的原生渲染路径（自绘 GUI，GPU 后端）。**不是"加速某些视图"** | 新目录 `apps/native/`（Rust）+ 共享的视图模型契约在 M0 | 新增：**视图模型单测（无头）** + 离屏渲染哈希比对 + 与 Web 前端的**同构断言**（同一输入 → 同一视图模型） | **尚未开工（P-E，先做 spike）**；详见 §五 |
@@ -45,10 +45,10 @@
 | M1 | ⚠️ 手工 | 无 CI 调用（GUI 段与版本放宽是本轮才补） |
 | M7 | ⚠️ 手工 | `smoke-ci.sh` 不在任何 CI |
 | M8 | ✅ | 已入门（P-A）：124 个前端测试 + 视图注册表的通用挂载保证 |
-| M9 | ⚠️ | 已入门，但**当前是红的**：`doctor.rs` 2 个失败（历史遗留，正修）。这正是门第一次运行的价值 |
+| M9 | ✅ | 已入门并转绿（34 passed；含 4 个 e2e，其中一条真跑 `scripts/doctor.sh`）。门第一次运行抓到并修掉了 2 个历史失败 |
 | M10 / M11 / M12 | — | 尚不存在 |
 
-**一句话结论**：D29.4 第一步已达成 —— 现在有一道门（`scripts/ci-gate.sh` + `.github/workflows/ci.yml`），覆盖 M0/M8/M9 与引擎；**且它第一次全量运行就抓出了 `doctor.rs` 的 2 个历史失败**。当前门为红，修完即转绿；M10 / M11 / M12 仍不存在，按 §三 的分期推进。
+**一句话结论**：D29.4 第一步已达成 —— 现在有一道门（`scripts/ci-gate.sh` + `.github/workflows/ci.yml`），覆盖 M0/M8/M9 与引擎；**且它第一次全量运行就抓出了 `doctor.rs` 的 2 个历史失败**（已修，`c7a19ac`，门现为 `pass=6 fail=0`）。M10 / M11 / M12 仍不存在，按 §三 的分期推进。
 
 ## 五、M12 第二前端渲染后端：批判与前置条件
 
