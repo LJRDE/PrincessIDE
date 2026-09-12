@@ -39,7 +39,13 @@ export function renderActionPanel(
   root.dataset['testid'] = 'action-panel';
 
   // Project status
+  // TODO(BUG-003): 待裁决后替换为原生选择器 (tauri-plugin-dialog).
   const projectRow = el('div', 'action-row project-status');
+  const projectPathInput = el('input', 'project-path-input');
+  projectPathInput.dataset['testid'] = 'project-path-input';
+  projectPathInput.setAttribute('type', 'text');
+  projectPathInput.setAttribute('placeholder', 'Enter project path…');
+  projectRow.appendChild(projectPathInput);
   const projectBtn = el('button', 'action-btn project-btn');
   projectBtn.dataset['testid'] = 'project-open-btn';
   projectBtn.textContent = '📂 Open Project';

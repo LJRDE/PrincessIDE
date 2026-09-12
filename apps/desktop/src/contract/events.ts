@@ -15,6 +15,16 @@
 /** Event-model version carried in the envelope's `v` field (contract §2, §7). */
 export const EVENT_MODEL_VERSION = 1;
 
+/**
+ * Tauri event channel the UI subscribes to (contract §2 transport).
+ *
+ * Mirror of the shell's `EVENT_CHANNEL` in
+ * `apps/desktop/src-tauri/src/events.rs` — every `EventBody` the engine emits
+ * arrives as an envelope on this one channel, so the name is part of the
+ * contract rather than a string literal to be repeated at each call site.
+ */
+export const EVENT_CHANNEL = 'princess:event';
+
 /** `log.append.payload.stream` (contract §2) — closed set. */
 export type LogStream = 'build' | 'serial.com1' | 'qemu.monitor' | 'gdb.console' | 'ide';
 export const LOG_STREAMS: readonly LogStream[] = [

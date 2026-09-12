@@ -15,16 +15,31 @@ import {
   renderEventStatus,
   renderFaultCard,
 } from './components/eventLog.js';
+import { renderActionPanel, type ActionPanelCallbacks } from './components/actionPanel.js';
 import { createEditor } from './components/editor.js';
-import { isTauri, opReplay, toolsDetect } from './ipc/client.js';
-import { expectedLanguageService } from './lsp/client.js';
+import {
+  isTauri,
+  opReplay,
+  toolsDetect,
+  buildStart,
+  buildCancel,
+  runStart,
+  runStop,
+  projectOpen,
+} from './ipc/client.js';
+import { expectedLanguageService, type ListenFn } from './lsp/client.js';
 import { createInitialState, replayEvents, type IdeState } from './state/eventStore.js';
 import { loadAllBundledFixtures } from './state/fixtureLoader.js';
+import { subscribeToLiveStream, type LiveStreamHandle } from './state/liveStream.js';
 
 export interface AppHandles {
   refreshTools(): Promise<void>;
   loadFixture(name: string): void;
   state(): IdeState;
+  /** Last build opId from the live event stream, or null. */
+  lastBuildOpId(): string | null;
+  /** Last run opId from the live event stream, or null. */
+  lastRunOpId(): string | null;
   destroy(): void;
 }
 
@@ -41,7 +56,12 @@ function section(root: HTMLElement, title: string, testid: string): HTMLElement 
   return body;
 }
 
-export function mountApp(root: HTMLElement): AppHandles {
+export interface MountAppOptions {
+  /** Injected Tauri `listen` for the event stream.  Absent = browser preview (degrades silently). */
+  listenFn?: ListenFn;
+}
+
+export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppHandles {
   root.textContent = '';
   root.className = 'app';
 
@@ -68,6 +88,11 @@ export function mountApp(root: HTMLElement): AppHandles {
   const right = document.createElement('div');
   right.className = 'col';
   grid.append(left, right);
+
+  // --- action panel (BUG-001 fix) -------------------------------------------
+  const actionBody = section(left, 'Actions', 'action-panel-section');
+  const actionHost = document.createElement('div');
+  actionBody.appendChild(actionHost);
 
   // --- toolchain panel -----------------------------------------------------
   const toolBody = section(left, 'Toolchain (princess:tools:detect)', 'toolchain-panel');
@@ -143,14 +168,110 @@ export function mountApp(root: HTMLElement): AppHandles {
   debugHost.className = 'debug-panel';
   eventsBody.appendChild(debugHost);
 
+  // --- error display (IPC failures, contract §0.4) -------------------------
+  const errorHost = document.createElement('div');
+  errorHost.className = 'ipc-errors';
+  errorHost.dataset['testid'] = 'ipc-errors';
+  root.appendChild(errorHost);
+
   let state = createInitialState();
+
+  /** Re-render all panels including the action panel. */
   const render = (): void => {
     renderEventStatus(statusBar, state);
     renderEventLog(logHost, state);
     renderFaultCard(faultHost, state);
     renderDiagnostics(diagHost, state);
     renderDebugPanel(debugHost, state);
+    renderActionPanel(actionHost, state, actionCallbacks);
   };
+
+  // --- Action panel callbacks wired to real IPC ----------------------------
+
+  /** Show an IPC error explicitly (contract §0.4: never blank, never silent). */
+  const showIpcError = (label: string, err: { code: string; message: string; detail: string }): void => {
+    const box = document.createElement('div');
+    box.className = 'error-box';
+    box.textContent = `${label} → ${err.code}: ${err.message}`;
+    errorHost.appendChild(box);
+    // Auto-remove after 10 seconds to avoid flooding.
+    setTimeout(() => box.remove(), 10_000);
+  };
+
+  const actionCallbacks: ActionPanelCallbacks = {
+    onBuild: () => {
+      void buildStart().then((res) => {
+        if (!res.ok) showIpcError('princess:build:start', res.error);
+      });
+    },
+    onRun: () => {
+      void runStart().then((res) => {
+        if (!res.ok) showIpcError('princess:run:start', res.error);
+      });
+    },
+    onStopBuild: () => {
+      const opId = liveStream.lastBuildOpId();
+      if (!opId) {
+        showIpcError('princess:build:cancel', {
+          code: 'E_INTERNAL',
+          message: 'No active build operation (no opId received from event stream)',
+          detail: '',
+        });
+        return;
+      }
+      void buildCancel(opId).then((res) => {
+        if (!res.ok) showIpcError('princess:build:cancel', res.error);
+      });
+    },
+    onStopRun: () => {
+      const opId = liveStream.lastRunOpId();
+      if (!opId) {
+        showIpcError('princess:run:stop', {
+          code: 'E_INTERNAL',
+          message: 'No active run operation (no opId received from event stream)',
+          detail: '',
+        });
+        return;
+      }
+      void runStop(opId).then((res) => {
+        if (!res.ok) showIpcError('princess:run:stop', res.error);
+      });
+    },
+    onProjectOpen: () => {
+      // BUG-003 placeholder: read path from text input.
+      // TODO(BUG-003): 待裁决后替换为原生选择器 (tauri-plugin-dialog).
+      const input = actionHost.querySelector<HTMLInputElement>('[data-testid="project-path-input"]');
+      const path = input?.value?.trim();
+      if (!path) {
+        showIpcError('princess:project:open', {
+          code: 'E_INTERNAL',
+          message: 'Please enter a project path',
+          detail: '',
+        });
+        return;
+      }
+      void projectOpen({ path }).then((res) => {
+        if (!res.ok) showIpcError('princess:project:open', res.error);
+      });
+    },
+  };
+
+  // Initial render of the action panel.
+  renderActionPanel(actionHost, state, actionCallbacks);
+
+  // --- Live event stream subscription (Task 2) -----------------------------
+
+  // In the Tauri shell, `listen` is available as `window.__TAURI_INTERNALS__`.
+  // We accept an injected listenFn for testability (D17 pattern from lsp/client.ts).
+  const liveStream: LiveStreamHandle = subscribeToLiveStream(state, {
+    listenFn: options.listenFn,
+    onStateChange: (newState) => {
+      state = newState;
+      render();
+    },
+  });
+
+  // --- Fixture-based offline replay ----------------------------------------
 
   const loadFixture = (name: string): void => {
     const fixture = fixtures.find((f) => f.name === name);
@@ -188,7 +309,12 @@ export function mountApp(root: HTMLElement): AppHandles {
     refreshTools,
     loadFixture,
     state: () => state,
-    destroy: () => editor.destroy(),
+    lastBuildOpId: () => liveStream.lastBuildOpId(),
+    lastRunOpId: () => liveStream.lastRunOpId(),
+    destroy: () => {
+      liveStream.unsubscribe();
+      editor.destroy();
+    },
   };
 }
 

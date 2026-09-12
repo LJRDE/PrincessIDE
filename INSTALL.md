@@ -44,6 +44,36 @@ sudo apt-get install -y \
 
 > **注意**：`bootstrap-toolchain.sh` 会自动下载大部分开发工具（QEMU、NASM、clangd 等）到工作区 `.toolchain/` 目录，不需要系统安装。上面的包只是构建 ISO 所需的基础依赖。
 
+#### GUI / 桌面依赖（Tauri 外壳必需）
+
+Tauri v2 的 Linux 外壳依赖 WebKitGTK 4.1 和 GTK3，缺少这些库时 `pnpm tauri dev` 会在**编译期**报错（找不到 `webkit2gtk-4.1` 等 pkg-config 模块）。
+
+```bash
+sudo apt-get update -y && sudo apt-get install -y \
+    libwebkit2gtk-4.1-dev \
+    libgtk-3-dev \
+    libjavascriptcoregtk-4.1-dev \
+    libsoup-3.0-dev \
+    librsvg2-dev \
+    libayatana-appindicator3-dev \
+    libxdo-dev \
+    libssl-dev \
+    pkg-config \
+    build-essential \
+    file \
+    wget \
+    curl
+```
+
+验证 WebKitGTK 已安装：
+
+```bash
+pkg-config --modversion webkit2gtk-4.1
+# 预期输出：2.50.6（或更高）
+```
+
+> **提示**：`scripts/doctor.sh` 也会检查这些 GUI 开发库。如果验证命令失败，请先运行 `bash scripts/doctor.sh` 查看具体缺少哪些模块。
+
 #### 2. 克隆仓库
 
 ```bash
