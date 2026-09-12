@@ -45,6 +45,14 @@ describe('app shell', () => {
     expect(root.querySelector('[data-testid="build-btn"]')).not.toBeNull();
     expect(root.querySelector('[data-testid="run-btn"]')).not.toBeNull();
 
+    // BUG-008: debug panel section must be present.
+    expect(root.querySelector('[data-testid="debug-panel-section"]')).not.toBeNull();
+    expect(root.querySelector('[data-testid="debug-panel"]')).not.toBeNull();
+    expect(root.querySelector('[data-testid="debug-attach-btn"]')).not.toBeNull();
+    expect(root.querySelector('[data-testid="debug-continue-btn"]')).not.toBeNull();
+    expect(root.querySelector('[data-testid="debug-regs-refresh-btn"]')).not.toBeNull();
+    expect(root.querySelector('[data-testid="debug-stack-refresh-btn"]')).not.toBeNull();
+
     app.destroy();
   });
 

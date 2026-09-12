@@ -102,6 +102,21 @@ export const projectValidate = (args?: { path?: string }, invokeFn?: InvokeFn) =
 export const debugAttach = (args?: { host?: string; port?: number; symbols?: string }, invokeFn?: InvokeFn) =>
   call('princess:debug:attach', args ?? {}, invokeFn);
 
+// BUG-008: debug convenience functions (minimal subset)
+export const debugSetBreakpoints = (
+  breakpoints: { file: string; line: number; enabled?: boolean }[],
+  invokeFn?: InvokeFn,
+) => call('princess:debug:setBreakpoints', { breakpoints }, invokeFn);
+
+export const debugContinue = (threadId?: number, invokeFn?: InvokeFn) =>
+  call('princess:debug:continue', { threadId }, invokeFn);
+
+export const debugStackTrace = (threadId?: number, invokeFn?: InvokeFn) =>
+  call('princess:debug:stackTrace', { threadId }, invokeFn);
+
+export const debugRegisters = (threadId?: number, invokeFn?: InvokeFn) =>
+  call('princess:debug:registers', { threadId }, invokeFn);
+
 // P3-C: LSP commands
 export const lspStart = (projectRoot: string, invokeFn?: InvokeFn) =>
   call('princess:lsp:start', { projectRoot }, invokeFn);

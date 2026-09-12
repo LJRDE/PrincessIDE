@@ -9,13 +9,14 @@
 
 import { createToolTableState, renderToolTable, type ToolTableState } from './components/toolTable.js';
 import {
-  renderDebugPanel,
+  renderDebugPanel as renderEventDebugPanel,
   renderDiagnostics,
   renderEventLog,
   renderEventStatus,
   renderFaultCard,
 } from './components/eventLog.js';
 import { renderActionPanel, type ActionPanelCallbacks, type DirSelectorFn } from './components/actionPanel.js';
+import { renderDebugPanel, type DebugPanelCallbacks } from './components/debugPanel.js';
 import { createEditor } from './components/editor.js';
 import {
   isTauri,
@@ -26,6 +27,11 @@ import {
   runStart,
   runStop,
   projectOpen,
+  debugAttach,
+  debugSetBreakpoints,
+  debugContinue,
+  debugStackTrace,
+  debugRegisters,
 } from './ipc/client.js';
 import { expectedLanguageService, type ListenFn } from './lsp/client.js';
 import { createInitialState, replayEvents, type IdeState } from './state/eventStore.js';
@@ -173,6 +179,11 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
   debugHost.className = 'debug-panel';
   eventsBody.appendChild(debugHost);
 
+  // --- BUG-008: Debug panel (attach/breakpoints/registers/stacktrace) -------
+  const debugPanelBody = section(right, 'Debug (BUG-008)', 'debug-panel-section');
+  const debugPanelHost = document.createElement('div');
+  debugPanelBody.appendChild(debugPanelHost);
+
   // --- error display (IPC failures, contract §0.4) -------------------------
   const errorHost = document.createElement('div');
   errorHost.className = 'ipc-errors';
@@ -181,13 +192,38 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
 
   let state = createInitialState();
 
+  // --- BUG-008: Debug panel callbacks wired to real IPC --------------------
+  const debugCallbacks: DebugPanelCallbacks = {
+    attach: async (args) => {
+      const res = await debugAttach({ host: args.host, port: args.port, symbols: args.symbols });
+      return res;
+    },
+    setBreakpoints: async (breakpoints) => {
+      const res = await debugSetBreakpoints(breakpoints);
+      return res;
+    },
+    continue: async () => {
+      const res = await debugContinue();
+      return res;
+    },
+    stackTrace: async () => {
+      const res = await debugStackTrace();
+      return res;
+    },
+    registers: async () => {
+      const res = await debugRegisters();
+      return res;
+    },
+  };
+
   /** Re-render all panels including the action panel. */
   const render = (): void => {
     renderEventStatus(statusBar, state);
     renderEventLog(logHost, state);
     renderFaultCard(faultHost, state);
     renderDiagnostics(diagHost, state);
-    renderDebugPanel(debugHost, state);
+    renderEventDebugPanel(debugHost, state);
+    renderDebugPanel(debugPanelHost, state, debugCallbacks);
     renderActionPanel(actionHost, state, actionCallbacks, actionPanelOptions);
   };
 

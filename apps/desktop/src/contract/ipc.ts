@@ -316,6 +316,55 @@ export interface DebugAttachData {
   note: string;
 }
 
+// ---------------------------------------------------------------------------
+// BUG-008: debug command argument/result types (minimal subset)
+// ---------------------------------------------------------------------------
+
+export interface DebugSetBreakpointsArgs {
+  breakpoints: { file: string; line: number; enabled?: boolean }[];
+}
+
+export interface DebugSetBreakpointsData {
+  breakpoints: { id: number; verified: boolean; location: string }[];
+}
+
+export interface DebugContinueArgs {
+  threadId?: number;
+}
+
+export interface DebugContinueData {
+  continued: boolean;
+}
+
+export interface DebugStackTraceArgs {
+  threadId?: number;
+}
+
+export interface DebugStackFrame {
+  id: number;
+  name: string;
+  file: string;
+  line: number;
+  pc: string;
+}
+
+export interface DebugStackTraceData {
+  frames: DebugStackFrame[];
+}
+
+export interface DebugRegistersArgs {
+  threadId?: number;
+}
+
+export interface DebugRegisterValue {
+  name: string;
+  value: string;
+}
+
+export interface DebugRegistersData {
+  registers: DebugRegisterValue[];
+}
+
 /** Per-command argument/result typing for the commands P3 exposes end-to-end. */
 export interface IpcMap {
   'princess:tools:detect': { args: Record<string, never>; data: ToolsDetectData };
@@ -328,6 +377,10 @@ export interface IpcMap {
   'princess:project:open': { args: ProjectOpenArgs; data: ProjectOpenData };
   'princess:project:validate': { args: ProjectValidateArgs; data: ProjectValidateData };
   'princess:debug:attach': { args: DebugAttachArgs; data: DebugAttachData };
+  'princess:debug:setBreakpoints': { args: DebugSetBreakpointsArgs; data: DebugSetBreakpointsData };
+  'princess:debug:continue': { args: DebugContinueArgs; data: DebugContinueData };
+  'princess:debug:stackTrace': { args: DebugStackTraceArgs; data: DebugStackTraceData };
+  'princess:debug:registers': { args: DebugRegistersArgs; data: DebugRegistersData };
   'princess:lsp:start': { args: LspStartArgs; data: LspStartData };
   'princess:lsp:send': { args: LspSendArgs; data: Record<string, never> };
   'princess:lsp:stop': { args: LspStopArgs; data: Record<string, never> };

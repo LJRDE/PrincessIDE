@@ -181,8 +181,8 @@
       "fix": "实现调试面板 UI：断点列表、寄存器视图、栈回溯视图、内存/反汇编视图，对接 princess:debug:* 的 12 个命令",
       "acceptance": "能在 GUI 中对 fixtures/paging-kernel 下断点并看到寄存器与源码级栈回溯",
       "reference": "docs/HANDOVER.md §7 功能缺口第 1 条",
-      "status": "in-progress",
-      "resolution": "用户裁决只做最小子集（attach/setBreakpoints/continue/stackTrace/registers 五个命令）；已派子 Agent"
+      "status": "fixed",
+      "resolution": "用户裁决只做最小子集（attach/setBreakpoints/continue/stackTrace/registers）。主 Agent 亲跑复核：vitest 121 passed（102→121）、tsc 0、check-contract ALIGNED（24 命令未变）、vite build 0；debugPanel 真挂载（app.ts 8 处引用）。5 个负样本（E_NOT_FOUND/E_QEMU_FAILED）+ 无回调降级均已测。未验证：真 QEMU+gdb 端到端与 GUI 视觉（无显示器）。"
     },
     {
       "id": "IMPROVE-001",
@@ -195,8 +195,8 @@
       "fix": "用 xargs -P N（默认 8，可用 PRINCESSIDE_DL_JOBS 覆盖）并行下载；保留失败收集与重试；注意每个 worker 写不同 .deb，apt 下载期间只读索引，APT::Sandbox::User=root 避免 _apt 权限问题",
       "acceptance": "同一环境下 bootstrap 总耗时明显下降；下载失败仍能正确报告缺失包名",
       "note": "用户主动提出，属优化非缺陷",
-      "status": "in-progress",
-      "resolution": "已派子 Agent（bootstrap 下载并行化，非破坏验证）"
+      "status": "reopened",
+      "resolution": "子 Agent 已改为 xargs -P（PRISSIDE_DL_JOBS 默认 8），但主 Agent 用负样本独立复现出**失败收集失效**：worker 是 bash -c 子进程，fail_file 是父函数 local 变量（export -f 不导出变量）→ 有包下载失败时函数仍返回 0 且不打印失败汇总。已退回重派修复。"
     }
   ],
   "summary": {
