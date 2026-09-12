@@ -1,0 +1,418 @@
+{
+  "schema": "princesside.tokenstats/v2",
+  "note": "usage 记录取自 assistant/chunk(chunk.type=usage)；模型归属按流式 model/selection 跟踪",
+  "by_model": {
+    "deepseek-official/deepseek-v4-flash": {
+      "steps": 2481,
+      "input": 2462256,
+      "output": 2207204,
+      "cache_read": 346299648,
+      "reasoning": 664201,
+      "total": 350969108
+    },
+    "xiaomi-token-plan-cn/mimo-v2.5-pro": {
+      "steps": 344,
+      "input": 1342837,
+      "output": 145326,
+      "cache_read": 123895552,
+      "reasoning": 17,
+      "total": 125383715
+    },
+    "deepseek-official/deepseek-v4-pro": {
+      "steps": 153,
+      "input": 119601,
+      "output": 139966,
+      "cache_read": 9944704,
+      "reasoning": 85203,
+      "total": 10204271
+    },
+    "deepseek-official/deepseek-v4-flash-vision-exp": {
+      "steps": 28,
+      "input": 648053,
+      "output": 28862,
+      "cache_read": 17691008,
+      "reasoning": 11753,
+      "total": 18367923
+    }
+  },
+  "by_kind": {
+    "agent": {
+      "steps": 2480,
+      "input": 2512731,
+      "output": 2038392,
+      "cache_read": 287418624,
+      "reasoning": 564455,
+      "total": 291969747
+    },
+    "main": {
+      "steps": 526,
+      "input": 2060016,
+      "output": 482966,
+      "cache_read": 210412288,
+      "reasoning": 196719,
+      "total": 212955270
+    }
+  },
+  "totals": {
+    "steps": 3006,
+    "input": 4572747,
+    "output": 2521358,
+    "cache_read": 497830912,
+    "reasoning": 761174,
+    "total": 504925017
+  },
+  "sessions": [
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-d0c4164b-f1f6-4906-af82-b45f7344ca13",
+      "kind": "main",
+      "steps": 526,
+      "input": 2060016,
+      "output": 482966,
+      "cache_read": 210412288,
+      "reasoning": 196719,
+      "total": 212955270
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-efdd6c9b-7983-4ae5-8a97-4b2a58f385b0",
+      "kind": "agent",
+      "steps": 212,
+      "input": 157332,
+      "output": 169679,
+      "cache_read": 41654784,
+      "reasoning": 0,
+      "total": 41981795
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-e60db6ce-8c3f-469e-953f-dce44bb5f0df",
+      "kind": "agent",
+      "steps": 256,
+      "input": 126422,
+      "output": 105885,
+      "cache_read": 34104064,
+      "reasoning": 0,
+      "total": 34336371
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-b15604e2-2b3b-4e1f-af5f-e82d399f076f",
+      "kind": "agent",
+      "steps": 134,
+      "input": 153485,
+      "output": 79455,
+      "cache_read": 20974464,
+      "reasoning": 0,
+      "total": 21207404
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-b9ee4442-ae0b-4f8e-9346-e0b981297c74",
+      "kind": "agent",
+      "steps": 160,
+      "input": 102583,
+      "output": 88486,
+      "cache_read": 18336640,
+      "reasoning": 0,
+      "total": 18527709
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "6a18e21e-f7ab-4d36-8320-04c80a3d19b1",
+      "kind": "agent",
+      "steps": 108,
+      "input": 78624,
+      "output": 204718,
+      "cache_read": 17731840,
+      "reasoning": 74160,
+      "total": 18015182
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-d3ab544a-44ee-4fcf-9b31-4be6a1ca55ba",
+      "kind": "agent",
+      "steps": 125,
+      "input": 111632,
+      "output": 113540,
+      "cache_read": 17409920,
+      "reasoning": 0,
+      "total": 17635092
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-e215f02c-4812-4c8e-a20a-6cb99a73e7c7",
+      "kind": "agent",
+      "steps": 112,
+      "input": 194007,
+      "output": 33498,
+      "cache_read": 17010560,
+      "reasoning": 0,
+      "total": 17238065
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "2cd8b82f-d4b1-42ed-aff9-fdf8bb2c9d8a",
+      "kind": "agent",
+      "steps": 122,
+      "input": 121317,
+      "output": 137594,
+      "cache_read": 15411072,
+      "reasoning": 65999,
+      "total": 15669983
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "1c225fcd-d457-4aff-b36c-1fe978562e8d",
+      "kind": "agent",
+      "steps": 114,
+      "input": 127030,
+      "output": 141088,
+      "cache_read": 14901632,
+      "reasoning": 43058,
+      "total": 15169750
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "3f4b1540-681e-466e-9491-ebb2ccb09735",
+      "kind": "agent",
+      "steps": 113,
+      "input": 64130,
+      "output": 176208,
+      "cache_read": 14416384,
+      "reasoning": 63109,
+      "total": 14656722
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-41c62884-a4b8-4726-9df4-3b0c0a2421ce",
+      "kind": "agent",
+      "steps": 118,
+      "input": 91084,
+      "output": 69750,
+      "cache_read": 11561088,
+      "reasoning": 0,
+      "total": 11721922
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "de29917e-1e1c-4cdb-b6b5-1cf457e5c895",
+      "kind": "agent",
+      "steps": 102,
+      "input": 84409,
+      "output": 75715,
+      "cache_read": 9176448,
+      "reasoning": 29618,
+      "total": 9336572
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-997f3c33-8f2a-461d-b081-9d072ce14eac",
+      "kind": "agent",
+      "steps": 111,
+      "input": 81603,
+      "output": 42839,
+      "cache_read": 9028480,
+      "reasoning": 0,
+      "total": 9152922
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "3e2f028c-ab57-4616-a7dd-f5488593377e",
+      "kind": "agent",
+      "steps": 90,
+      "input": 63294,
+      "output": 115303,
+      "cache_read": 8357632,
+      "reasoning": 57466,
+      "total": 8536229
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "c6980b9e-9710-4158-93bd-463ecc38d207",
+      "kind": "agent",
+      "steps": 93,
+      "input": 57755,
+      "output": 103007,
+      "cache_read": 6837632,
+      "reasoning": 60660,
+      "total": 6998394
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-98bf4e8d-9d19-47e8-8f06-a71ccf15be49",
+      "kind": "agent",
+      "steps": 63,
+      "input": 83997,
+      "output": 71483,
+      "cache_read": 5526144,
+      "reasoning": 32059,
+      "total": 5681624
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-3408716f-17a2-4089-a5ef-613a214f10b8",
+      "kind": "agent",
+      "steps": 52,
+      "input": 60377,
+      "output": 50876,
+      "cache_read": 4113536,
+      "reasoning": 24134,
+      "total": 4224789
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-6e842889-ac94-40ec-8a25-6e45e68e7dde",
+      "kind": "agent",
+      "steps": 58,
+      "input": 63243,
+      "output": 39493,
+      "cache_read": 3461248,
+      "reasoning": 27280,
+      "total": 3563984
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "662823b3-8ebe-4197-b8c1-a3259e0f3ccc",
+      "kind": "agent",
+      "steps": 48,
+      "input": 100767,
+      "output": 27587,
+      "cache_read": 3379328,
+      "reasoning": 19018,
+      "total": 3507682
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "bcf4c9dc-cf9b-4121-856c-0af548f8f788",
+      "kind": "agent",
+      "steps": 59,
+      "input": 53686,
+      "output": 36954,
+      "cache_read": 3107072,
+      "reasoning": 24543,
+      "total": 3197712
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "022125fe-bb16-4b5e-ab52-ee5d862fa4a6",
+      "kind": "agent",
+      "steps": 65,
+      "input": 38503,
+      "output": 38238,
+      "cache_read": 2793216,
+      "reasoning": 17665,
+      "total": 2869957
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "d1822281-462e-47f9-bb3c-2559cb4b2310",
+      "kind": "agent",
+      "steps": 28,
+      "input": 137287,
+      "output": 38613,
+      "cache_read": 2045056,
+      "reasoning": 17277,
+      "total": 2220956
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-ed9ce188-9b5e-4876-b7f0-d4c173e474b1",
+      "kind": "agent",
+      "steps": 28,
+      "input": 80900,
+      "output": 13697,
+      "cache_read": 1734784,
+      "reasoning": 0,
+      "total": 1829381
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-f1e0faf5-9a17-4bd0-a91c-5e65dab14e6a",
+      "kind": "agent",
+      "steps": 38,
+      "input": 42723,
+      "output": 23680,
+      "cache_read": 1338240,
+      "reasoning": 0,
+      "total": 1404643
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-e1249f0a-399a-4788-aafb-3135eafa0cca",
+      "kind": "agent",
+      "steps": 18,
+      "input": 77193,
+      "output": 21876,
+      "cache_read": 1030144,
+      "reasoning": 0,
+      "total": 1129213
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "d0d3a782-aa82-4888-90ba-57f0b2018398",
+      "kind": "agent",
+      "steps": 18,
+      "input": 74749,
+      "output": 8777,
+      "cache_read": 917760,
+      "reasoning": 6662,
+      "total": 1001286
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-54ee97cb-327e-41f0-81ff-64f4c35c7474",
+      "kind": "agent",
+      "steps": 19,
+      "input": 53409,
+      "output": 4173,
+      "cache_read": 861312,
+      "reasoning": 0,
+      "total": 918894
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "5a4e2ece-9b8e-407d-9fe0-11c1be7adc0b",
+      "kind": "agent",
+      "steps": 11,
+      "input": 11948,
+      "output": 6057,
+      "cache_read": 175232,
+      "reasoning": 1747,
+      "total": 193237
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "3ef2407f-8d67-4164-94c0-1da470207336",
+      "kind": "agent",
+      "steps": 2,
+      "input": 2960,
+      "output": 46,
+      "cache_read": 15104,
+      "reasoning": 0,
+      "total": 18110
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "session-06e2dc55-53e0-4832-8dd3-10e6dd679619",
+      "kind": "agent",
+      "steps": 2,
+      "input": 8122,
+      "output": 72,
+      "cache_read": 7808,
+      "reasoning": 0,
+      "total": 16002
+    },
+    {
+      "workspace": "--root-PrincessIDE--",
+      "session": "8713b4f9-ab82-404b-93ea-b30cec5f8860",
+      "kind": "agent",
+      "steps": 1,
+      "input": 8160,
+      "output": 5,
+      "cache_read": 0,
+      "reasoning": 0,
+      "total": 8165
+    }
+  ]
+}
