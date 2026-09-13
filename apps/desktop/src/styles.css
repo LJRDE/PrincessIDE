@@ -130,10 +130,43 @@ body {
   flex-direction: column;
 }
 
+/* Full-height editor, driven by flex rather than percentages.
+ *
+ * CodeMirror's base theme ships `.cm-scroller { height: 100%; overflow-x: auto }`
+ * — a percentage height, and no vertical overflow of its own.  A percentage only
+ * resolves against a parent with a *definite* height; inside a flex column the
+ * parent's height is flex-derived, so it fell back to `auto`.  The scroller then
+ * grew to fit the text instead of scrolling, and `.main`'s `overflow: hidden`
+ * clipped the overflow: the wheel had no scrollable box anywhere, so the editor
+ * could not be scrolled at all.
+ *
+ * Every level of the chain therefore gets `min-height: 0` (so a flex item may be
+ * smaller than its content) and the two CodeMirror boxes become flex columns.
+ * `.cm-scroller`'s percentage height is overridden because it is precisely the
+ * thing that does not resolve here; our selector is more specific than the base
+ * theme's, and that rule is not marked !important.
+ */
+.main .panel-editor,
+.main .panel-editor > div,
+.main .editor-host,
+.main .cm-editor,
+.main .cm-scroller {
+  min-height: 0;
+}
+
 .main .editor-host,
 .main .cm-editor {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.main .cm-scroller {
+  flex: 1 1 auto;
+  height: auto;
+  overflow-y: auto;
+  overflow-x: auto;
 }
 
 .dock {
@@ -379,6 +412,8 @@ details pre {
   gap: 8px;
   margin-bottom: 8px;
   flex-wrap: wrap;
+  /* A fixed-height strip: it must not be squeezed when the editor needs room. */
+  flex: 0 0 auto;
 }
 
 .editor-toolbar button {
