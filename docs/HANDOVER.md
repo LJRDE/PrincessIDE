@@ -11,8 +11,8 @@
 
 ## 1. 项目规模
 
-> ⚠️ **统计口径**：下表行数是**静态实测**（`find`+`wc`）。测试数是**静态计数**（`#[test]` / `it(` 出现次数），**不是执行结果**——本机未装 `.toolchain/`，未跑过测试。
-> 历史**执行**结果（在上一台机器上亲跑）见 §5，那批结论对应提交 75。
+> ⚠️ **统计口径**：下表行数与测试数都是**静态实测**（`find`/`wc`/`grep`），不是执行结果。
+> **真实执行结果见 §5.2**（本机已亲跑：快速门全绿、引擎 615 passed / 5 failed）；§5.1 是上一台机器的历史结论。
 
 | 维度 | 数值 |
 |---|---|
@@ -219,17 +219,37 @@ pnpm -C apps/desktop tauri dev
 | 符号化 | `cargo run -p princess-symbol --example symbolicate` | `kernel.c:100` ✅ |
 | 分页夹具 | `bash fixtures/paging-kernel/run.sh` | exit 0（横幅 + `#PF`） |
 
-### 5.2 本机已亲跑（无需工具链的两道门）✅
+### 5.2 本机亲跑：真实结果 ✅（无需 `.toolchain/` bootstrap）
 
 | 检查项 | 命令 | 结果 |
 |---|---|---|
-| **契约三方一致** | `node apps/desktop/scripts/check-contract.mjs` | **`result: ALIGNED`** — spec/TS/Rust 各 24 命令逐字一致、10 错误码三方一致、无待修订豁免 |
-| **边界门** | `python3 scripts/check-boundaries.py` | **exit 0** — 成员关系、工具链禁令、模块所有权均通过 |
+| **快速门（4 步）** | `bash scripts/ci-gate.sh --fast` | **`pass=4 fail=0`** — tsc / vitest 124 / 契约 / vite build / 边界门 |
+| **契约三方一致** | `node apps/desktop/scripts/check-contract.mjs` | **`result: ALIGNED`** — spec/TS/Rust 各 24 命令逐字一致、10 错误码三方一致 |
+| **边界门** | `python3 scripts/check-boundaries.py` | **exit 0** |
+| **前端测试** | `pnpm -C apps/desktop exec vitest run` | **124 passed / 11 files**（Node 24.21.0） |
+| **引擎测试** | `cargo test --workspace --no-fail-fast` | **615 passed / 5 failed / 2 ignored**（见 §5.3） |
+| **符号化验收** | `cargo run -p princess-symbol --example symbolicate fixtures/refkernel/build/refkernel.elf 0x100b3d` | **`refkernel_fault_probe` → `kernel.c:100`** ✅，与系统 `addr2line` 一致 |
 
-> 这两道门是纯文本检查（不需要 cargo/pnpm/QEMU），因此本机可以直接跑。
-> 其余门（`ci-gate` 的 1–6 步）依赖 `.toolchain/` 与 `node_modules/`，尚未安装。
+> **跑引擎测试前必须先构建夹具**：`make -C fixtures/refkernel && make -C fixtures/paging-kernel`。
+> 这两个产物被 `.gitignore` 排除（第 41、59 行），全新克隆里不存在——**不构建就会有 41 个测试失败**，
+> 构建后降到 5 个。夹具用 `gcc` 汇编 `.S` 文件，**不需要 nasm**。
+>
+> 前端测试需要 `pnpm install`；本机默认 registry（`registry.npmjs.org`）不通，
+> 需加 `--registry=https://registry.npmmirror.com`。
 
-### 5.3 本机静态计数（未执行）
+### 5.3 引擎测试剩余 5 个失败：全部是环境问题，无一是代码缺陷
+
+| 测试 | 现象 | 真实原因 |
+|---|---|---|
+| `princess-ai::http::an_unresolvable_host_is_bounded_and_never_panics` | 实测 20.017s，断言要求 < 5s | **DNS 环境**：本机 nameserver 对不存在域名不返回 NXDOMAIN，glibc 把 `timeout 5s × attempts 2 × 2 台 = 20s` 耗满 |
+| `princess-cli::env::toolchain_path_contains_the_workspace_bins_and_is_idempotent` | `dirs.contains(".toolchain/cargo/bin")` 失败 | **需 `bootstrap-toolchain.sh`** |
+| `princess-cli::env::detects_the_host_toolchain_from_a_clean_environment` | `cargo.path.contains(".toolchain")` 失败 | **需 `bootstrap-toolchain.sh`** |
+| `princess-debug::transport::adapter_exit_is_reported_as_a_backend_failure` | 拿到 `Broken pipe (os error 32)` 而非期望错误 | **竞态 flaky**：`/bin/sh -c exit 0` 在写入前先退出 |
+| `princess-symbol::header_inline_row_matches_the_line_program_and_gdb_not_binutils` | 期望 binutils 归属分歧，实得 `paging.h:37` | **golden 依赖宿主工具链版本**：夹具由本机 gcc 14.2 构建，而 golden 录自更早的 gcc/binutils；两者这次恰好一致，导致"只接受分歧"的断言失效 |
+
+> 最后一条暴露的是**可复现性缺口**：夹具构建未固定 gcc 版本，而 golden 值随宿主 DWARF 行程序漂移。
+
+### 5.4 本机静态计数（未执行的部分）
 
 | 项 | 静态值 |
 |---|---|
@@ -239,7 +259,7 @@ pnpm -C apps/desktop tauri dev
 | IPC 命令 | 24（已由契约门实测确认） |
 | 错误码 | 10（`E_AI_UNAVAILABLE` `E_BUILD_FAILED` `E_CANCELLED` `E_INTERNAL` `E_INVALID_CONFIG` `E_NOT_FOUND` `E_QEMU_FAILED` `E_SANDBOX_DENIED` `E_TIMEOUT` `E_TOOLCHAIN_MISSING`） |
 
-### 5.4 ❌ 尚未验证的东西（诚实标注）
+### 5.5 ❌ 尚未验证的东西（诚实标注）
 
 | 项 | 原因 |
 |---|---|
@@ -326,16 +346,27 @@ pnpm -C apps/desktop tauri dev
 4. **`princess-bisect` / `princess-plugins` 已在根 workspace 成员里但没有测试**——门会跑过它们，但等于空转
 5. ~~**CI 永远不会触发**~~ **已修**（`be44149`）：`ci.yml` 原本只监听 `branches: [main]`，而工作分支是
    `PrincessIDE`、旧远端跟踪还是 `master`，三者不一致导致门从不触发。现已改为 `PrincessIDE`，
-   并在 `LJRDE/PrincessIDE` 上实测触发成功。**注意**：`ci-gate.sh` 第 5/6 步依赖 `.toolchain/`，
-   而 workflow 里没有 `bootstrap-toolchain.sh` 那一步——runner 上靠系统自带 rustup 兜底，CI 能否全绿需看实际运行。
-6. **`/etc/hosts` 劫持了 `api.github.com`**（本机环境坑）：该文件把 `api.github.com` 与 `github.com`
+   并在 `LJRDE/PrincessIDE` 上实测触发成功。
+6. **⚠️ 但 CI 修好分支名后会连挂三步**（因为它此前从未跑过，这些缺陷一直没暴露）。实测证据：
+   - **第 2 步**：Node 20 上 `jsdom@30` 的 `undici@8` 调用 `webidl.util.markAsUncloneable` 直接抛错
+     → 已修为 `node-version: '24'`（本机 124 测试在此版本全绿），**该提交尚待推送**。
+   - **第 5 步**：`cargo test --workspace` 需要夹具已构建（`fixtures/*/build/*.elf` 被 gitignore）
+     与 `.toolchain/` 就位；workflow 两者都没做 → 必挂（见 §5.3：裸跑 41 个失败）。
+   - **第 6 步**：`tools_detect_e2e.rs` 真跑 `scripts/doctor.sh` 并断言 `missing.is_empty()`，
+     而 workflow 没装 nasm/clangd-16/bear/princess-gdb → 必挂。
+   **结论**：`ci-gate.sh` 的 1–4、7 步可以在裸 runner 上跑；5、6 步要么在 CI 里 bootstrap
+   （下载数 GB，且源在国内，不现实），要么把这步拆成"仅本机/带工具链时运行"。
+7. **`/etc/hosts` 劫持了 `api.github.com`**（本机环境坑）：该文件把 `api.github.com` 与 `github.com`
    指向同一个 IP `20.205.243.166`，而 API 的真实地址是 `20.205.243.168`。后果是**所有 GitHub API 调用
    落到网页服务上**，返回 301/406：`gh auth login` 直接报 `error validating token: HTTP 406`，
    `gh api` 全部失效（`git` 本身不受影响，因为它走 `github.com`）。
    `/etc/hosts` 是 `root:root 0644`，本项目在容器内无可用 root（`sudo` 需密码 + `no-new-privileges`），
    所以 `.toolchain/bin/gh` 启动器用**私有挂载命名空间**（`unshare --mount --map-root-user` + bind mount）
    喂给 gh 一份修正的 hosts；一旦你在宿主侧修好 `/etc/hosts`，启动器会走快速路径自动停用绕行。
-7. **`docs/reports/fixlist.json` 的 10 项**：**9 项 `fixed` + 1 项 `not-a-bug`**（不是"全部 fixed"）
+8. **本机 DNS 对不存在域名不返回 NXDOMAIN**：解析 `.invalid` 要耗满 glibc 的 20s 预算
+   （`timeout 5s × attempts 2 × 2 台 nameserver`），直接导致 §5.3 里 `princess-ai` 那个测试失败。
+   同一个解析器行为也解释了第 7 条的 API 劫持排查方向。
+9. **`docs/reports/fixlist.json` 的 10 项**：**9 项 `fixed` + 1 项 `not-a-bug`**（不是"全部 fixed"）
 
 ---
 
@@ -427,14 +458,19 @@ clangd 报错？  → 检查 .clangd 是否用了 -nostdlibinc（不是 -nostdin
 - [x] 23 份交付报告 + 4 份调研报告 + 34 条决策记录
 - [x] README + INSTALL + 打包脚本 + 冒烟 CI 脚本
 - [x] **删除误建的 `newrepo/`**（空 git 仓库，无 commit/ref/object）
-- [x] **本机亲跑两道无需工具链的门**：契约门 `ALIGNED`、边界门 exit 0（§5.2）
 - [x] **GitHub 远端接好**：`origin` 原指向本地 `.git`（坏），已改为 `LJRDE/PrincessIDE` 并推送
-- [x] **CI 分支名已修**：`ci.yml` 由 `main` 改为 `PrincessIDE`，实测触发成功
-- [ ] **本机未装工具链**：`.toolchain/` 里目前只有手工装的 gh；`target/` / `node_modules/` 不存在 → 先跑 §4 第 1 步
-- [ ] **`ci-gate` 的 1–6 步本机未跑**：§5.3 全是静态计数，§5.1 是上一台机器的历史结论
-- [ ] **待修 bug 清单**：`docs/reports/fixlist.json` 里 10 项已处理（9 fixed + 1 not-a-bug），新清单需你提供
+- [x] **CI 分支名已修**：`ci.yml` 由 `main` 改为 `PrincessIDE`，实测触发成功；孤儿 `main` 已删除
 - [x] **许可证与声明对齐**：`LICENSE`（MIT）+ 新增 `LICENSE-APACHE`，与 `Cargo.toml` 的 `MIT OR Apache-2.0` 一致
-- [ ] **界面待首次真机启动**：`pnpm -C apps/desktop tauri dev`
+- [x] **快速门本机全绿**：`ci-gate.sh --fast` → `pass=4 fail=0`（§5.2）
+- [x] **引擎测试本机已亲跑**：`cargo test --workspace --no-fail-fast` → **615 passed / 5 failed / 2 ignored**，
+      5 个失败全部定位为环境问题（§5.3）
+- [x] **符号化验收通过**：`refkernel_fault_probe` → `kernel.c:100`，与 `addr2line` 一致（§5.2）
+- [x] **夹具已构建**：`fixtures/{refkernel,paging-kernel}/build/*.elf`（**被 gitignore，克隆后必须重建**）
+- [ ] **⚠️ 有 2 个提交尚未推送**（网络到 github.com 不稳）：`ci: run on Node 24` + 本文档更新
+- [ ] **CI 第 5、6 步仍会失败**，原因与修法见 §7 技术债 6（需决定：CI 里 bootstrap，或把这两步拆出 CI）
+- [ ] **`.toolchain/` 未 bootstrap**：目前只有手工装的 gh；`princess-gdb` / `clangd-16` / `bear` / `nasm` 均缺
+- [ ] **界面待首次真机启动**：`pnpm -C apps/desktop tauri dev`（GUI 系统依赖本机已齐全）
+- [ ] **待修 bug 清单**：`docs/reports/fixlist.json` 里 10 项已处理（9 fixed + 1 not-a-bug），新清单需你提供
 
 ---
 
