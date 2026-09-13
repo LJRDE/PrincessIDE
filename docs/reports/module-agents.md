@@ -34,3 +34,21 @@
 3. **P-F1 的负样本用了 `mv … .hidden`**（违反 D28.3；本次无残留但属侥幸）→ 派发手册 §二.5 已把禁令固化。
 4. **M5/M6 后端已完工但契约 0 命令、前端 0 行**（最大的"已投入未交付"）→ 归 `[M5M6·Contracts]`。
 5. **P-E2（可编辑 + IME）与 M12 的底层选型（wgpu vs ash）仍未决** → 需用户裁决后才派。
+
+## 四、边界门（D33：约定即数据、数据即门）
+
+`python3 scripts/check-boundaries.py`（`ci-gate.sh` 第 7 步，**永远运行**）检查三类边界，违规即非零：
+
+1. **workspace 成员**：`crates/*` 必须在根成员里；独立 workspace 必须登记**且有门覆盖**；
+2. **工具链禁令**：`.toolchain/**` 不得改名/删除，不得留 `.hidden` 残留（D28.3 事故特征）；
+3. **模块所有权**（`--agent <模块>`，需派发基线）：变动集必须落在该模块 `docs/spec/ownership.toml` 的 `allow` 内；
+   `shared` 需显式授权；`governance` 任何 Agent 都不许碰。
+
+**它已经记录在案的真实事故**：
+
+| 事故 | 现状 |
+|---|---|
+| M11 把 `crates/princess-plugins` 从根 members 删掉（该模块掉出 CI） | **已恢复**（复核时已在 members 内）；假树负样本证明规则会开火 |
+| M11 增加 `tempfile` dev-dependency（违反我当时后加的"不新增依赖"） | **保留**（lock 多 4 个包，可接受；禁令晚于它的开工时间，责任在主 Agent） |
+| P-F1 用 `mv .toolchain/bin/jdtls → .hidden` 造负样本（D28.3 禁止） | 无残留；**该手法现已由第 2 类检查覆盖** |
+| `apps/native`（M12 独立 workspace）**尚未接入 `ci-gate.sh`** | 已在 `ownership.toml` 的 `independent_workspaces.coverage` 里**显式登记为已知缺口** |

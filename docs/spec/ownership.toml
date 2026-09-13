@@ -1,0 +1,164 @@
+# 模块所有权与边界（机器可读）——"约定即数据，数据即门"
+#
+# 为什么存在这个文件（用户 2026-09-13 的批评）：
+#   在它之前，六条边界里**只有契约那条是机器强制的**（check-contract.mjs），其余靠文档 + 主 Agent 事后复核。
+#   后果是真实的：M11 的子 Agent 把 `crates/princess-plugins` 从根 workspace 成员里删掉（该模块就此**掉出 CI 门**，
+#   正是 BUG-009 那种"没有门的模块"），并加了任务书禁止的依赖；P-F1 的子 Agent 用 `mv .toolchain/... .hidden`
+#   造负样本（D28.3 明令禁止）。**都不报错**。
+#   修法不是"再写更严的文档"，而是把约定落成**数据**（本文件）+ **门**（`scripts/check-boundaries.py`，由 ci-gate 调用）。
+#
+# 用法：
+#   python3 scripts/check-boundaries.py                  # 全量检查（成员关系 + 工具链禁令 + 所有权，若有 PRINCESSIDE_AGENT）
+#   python3 scripts/check-boundaries.py --agent M11       # 指定模块做所有权检查
+#   python3 scripts/check-boundaries.py --print-ownership M11   # 打印可直接贴进任务书的所有权段（生成器）
+#
+# 治理规则（见 D33）：**本文件与检查器只允许主 Agent 修改**。被治理者不得改治理规则。
+
+[meta]
+version = 1
+# 所有权地图的权威散文版在 docs/spec/30-modules.md；本文件是它的可执行副本。
+prose = "docs/spec/30-modules.md"
+
+# ---------------------------------------------------------------------------
+# 只允许主 Agent 改的"治理文件"（不动点：否则门可以被被治理者拆掉）
+# ---------------------------------------------------------------------------
+[governance]
+paths = [
+    "docs/spec/ownership.toml",
+    "scripts/check-boundaries.py",
+    "scripts/ci-gate.sh",
+    "docs/spec/00-decisions.md",
+    "docs/spec/34-module-dispatch.md",
+]
+
+# ---------------------------------------------------------------------------
+# 共享资源：改动意味着"跨模块"，必须先经主 Agent 授权（并在模块的 allow 里显式列出才放行）
+# ---------------------------------------------------------------------------
+[shared]
+paths = [
+    "Cargo.toml",                                              # 根工作区成员与 [workspace.dependencies]
+    "Cargo.lock",                                              # 加依赖即改写它
+    "docs/spec/10-contracts.md",                               # 契约三处镜像（原子迁移）
+    "apps/desktop/src/contract/ipc.ts",
+    "apps/desktop/src-tauri/src/contract.rs",
+    "apps/desktop/src-tauri/src/commands.rs",
+    "scripts/doctor.sh",
+    "scripts/env.sh",
+    "scripts/bootstrap-toolchain.sh",
+]
+
+# ---------------------------------------------------------------------------
+# 故意独立于根工作区的 crate：不是根成员**是合法的**，但必须在这里登记
+# （否则"掉出门外"与"有意独立"无法区分 —— 这正是 M11 那次事故的核心模糊点）
+# ---------------------------------------------------------------------------
+[independent_workspaces]
+paths = [
+    "apps/desktop/src-tauri",   # Tauri 外壳：自带 [workspace]，避免污染引擎测试
+    "apps/native",              # M12 第二前端：自带 [workspace]
+]
+# 登记为独立的 crate 必须由某个门覆盖（否则它仍然「没有门」）。
+# 注意：TOML 1.0 的内联表不能跨行，所以这里用子表而不是 { ... }。
+[independent_workspaces.coverage]
+"apps/desktop/src-tauri" = "scripts/ci-gate.sh 第 6 步（在该目录内跑 cargo test）"
+"apps/native" = "模块自带门：在 apps/native 内跑 cargo test + 离屏渲染哈希；尚未接入 ci-gate（P-E1 进行中，见台账「已知缺口」）"
+
+# ---------------------------------------------------------------------------
+# 模块所有权。allow = 允许写的 glob；gate = 该模块的门；task_book = 任务书路径
+# 加模块就往这里加一段，然后 `--print-ownership <id>` 生成任务书里的所有权段。
+# ---------------------------------------------------------------------------
+[modules.M0]
+title = "契约层（core 的对外面）"
+task_book = "—（冻结；改动须走契约四件套）"
+gate = ["node apps/desktop/scripts/check-contract.mjs", "cargo test -p princess-core"]
+allow = ["crates/princess-core/**", "docs/spec/10-contracts.md"]
+
+[modules.M1]
+title = "工具链 / 环境"
+task_book = ".scratch/main/mimo-m1-task.md"
+gate = ["bash scripts/doctor.sh"]
+allow = ["scripts/doctor.sh", "scripts/env.sh", "scripts/bootstrap-toolchain.sh", ".scratch/mimo-m1/**"]
+
+[modules.M2]
+title = "构建"
+task_book = "—"
+gate = ["cargo test -p princess-build"]
+allow = ["crates/princess-build/**", "languages/*.toml"]
+
+[modules.M3]
+title = "运行"
+task_book = "—"
+gate = ["cargo test -p princess-run"]
+allow = ["crates/princess-run/**"]
+
+[modules.M4]
+title = "调试"
+task_book = "—"
+gate = ["cargo test -p princess-debug"]
+allow = ["crates/princess-debug/**"]
+
+[modules.M5]
+title = "符号化 / 二进制"
+task_book = ".scratch/main/mimo-m5m6-task.md"
+gate = ["cargo test -p princess-symbol -p princess-bin"]
+allow = ["crates/princess-symbol/**", "crates/princess-bin/**"]
+
+[modules.M6]
+title = "AI"
+task_book = ".scratch/main/mimo-m5m6-task.md"
+gate = ["cargo test -p princess-ai"]
+allow = ["crates/princess-ai/**"]
+
+[modules.M7]
+title = "夹具与验收"
+task_book = "—"
+gate = ["bash scripts/smoke-ci.sh"]
+allow = ["fixtures/refkernel/**", "fixtures/paging-kernel/**", "fixtures/events/**", "fixtures/view/**",
+         "docs/spec/20-acceptance.md", "templates/**"]
+
+[modules.M8]
+title = "前端外壳 / 视图"
+task_book = "—"
+gate = ["pnpm -C apps/desktop exec vitest run"]
+allow = ["apps/desktop/src/**", "apps/desktop/tests/**", "apps/desktop/package.json", "apps/desktop/vite.config.ts"]
+
+[modules.M9]
+title = "桌面壳"
+task_book = "—"
+gate = ["cargo test（在 apps/desktop/src-tauri 内）"]
+allow = ["apps/desktop/src-tauri/**"]
+
+[modules.M10]
+title = "编排器（bisect）"
+task_book = ".scratch/main/mimo-m10-task.md"
+gate = ["cargo test -p princess-bisect"]
+allow = ["crates/princess-bisect/**", "scripts/bisect-demo.sh", ".scratch/mimo-m10/**"]
+
+[modules.M11]
+title = "插件管理（声明式）"
+task_book = ".scratch/main/mimo-m11-task.md"
+gate = ["cargo test -p princess-plugins"]
+allow = ["crates/princess-plugins/**", "fixtures/plugins/**", ".scratch/mimo-m11/**"]
+
+[modules.M12]
+title = "第二前端（原生自绘）"
+task_book = ".scratch/main/mimo-m12-task.md"
+gate = ["cargo test（在 apps/native 内）"]
+allow = ["apps/native/**", ".scratch/mimo-m12/**"]
+
+[modules.M13]
+title = "语言模块层（Java 首例）"
+task_book = ".scratch/main/mimo-m13-task.md"
+gate = ["cargo test -p princess-debug -p princess-lang"]
+allow = ["crates/princess-lang/**", "crates/princess-debug/**", "languages/**", "fixtures/javaproj/**",
+         ".scratch/mimo-m13/**"]
+
+[modules.M5M6]
+title = "契约面与前端（P-D，合并路）"
+task_book = ".scratch/main/mimo-m5m6-task.md"
+gate = ["node apps/desktop/scripts/check-contract.mjs", "pnpm -C apps/desktop exec vitest run"]
+# 这一路**被授权**改契约三处镜像（W3 串行队列，主 Agent 显式授权）
+allow = ["docs/spec/10-contracts.md", "apps/desktop/src/contract/ipc.ts", "apps/desktop/src/ipc/client.ts",
+         "apps/desktop/src/components/**", "apps/desktop/src/views/**", "apps/desktop/tests/**",
+         "apps/desktop/src-tauri/src/contract.rs", "apps/desktop/src-tauri/src/commands.rs",
+         "apps/desktop/src-tauri/src/symbols_handler.rs", "apps/desktop/src-tauri/src/bin_handler.rs",
+         "apps/desktop/src-tauri/src/ai_handler.rs", ".scratch/mimo-m5m6/**"]
