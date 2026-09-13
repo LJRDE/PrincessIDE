@@ -164,6 +164,13 @@ PRINCESSIDE_LANG_SERVICE_CLANGD="$PRINCESSIDE_CLANGD16"
 export PRINCESSIDE_CLANGD16 PRINCESSIDE_CLANGD14 PRINCESSIDE_CLANG16 \
        PRINCESSIDE_BEAR PRINCESSIDE_LANG_SERVICE_CLANGD
 
+# ------------------------------------------------------- Java language service (D31/P-F1)
+# jdtls (Eclipse JDT Language Server) for Java language support.
+# D31: Language modules are pluggable; jdtls is installed into .toolchain/jdtls/.
+PRINCESSIDE_JDTLS="$PRINCESSIDE_BIN/jdtls"
+PRINCESSIDE_LANG_SERVICE_JDTLS="$PRINCESSIDE_JDTLS"
+export PRINCESSIDE_JDTLS PRINCESSIDE_LANG_SERVICE_JDTLS
+
 # ------------------------------------------------------------ debug backend (A9)
 # The IDE's debug backend must use a gdb >= 14, because the built-in DAP
 # interpreter P4 relies on (D11) only exists from gdb 14 onwards.  This host's

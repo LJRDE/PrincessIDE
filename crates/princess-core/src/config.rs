@@ -36,6 +36,8 @@ pub const DEFAULT_BOOT: BootProtocol = BootProtocol::Multiboot2;
 pub const DEFAULT_SERIAL_TEE: &str = "build/serial.log";
 
 /// Source language of the project (`[project] language`).
+///
+/// D31: Language modules are pluggable; Java is the first non-kernel language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Language {
     #[serde(rename = "c")]
@@ -48,6 +50,9 @@ pub enum Language {
     Rust,
     #[serde(rename = "zig")]
     Zig,
+    /// Java language support (D31).  Requires `javac` build backend and `jvm` run backend.
+    #[serde(rename = "java")]
+    Java,
 }
 
 impl Default for Language {
@@ -76,6 +81,8 @@ impl Default for Arch {
 }
 
 /// Build backend selector (`[build] backend`).
+///
+/// D31: `Javac` added for Java language module (P-F1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BuildBackendKind {
     #[serde(rename = "make")]
@@ -86,6 +93,9 @@ pub enum BuildBackendKind {
     Cargo,
     #[serde(rename = "zig")]
     Zig,
+    /// Java compiler (`javac`).  D31: P-F1 build backend for Java.
+    #[serde(rename = "javac")]
+    Javac,
     /// Escape hatch: `backend = "custom"` + `command`.
     #[serde(rename = "custom")]
     Custom,
@@ -104,16 +114,22 @@ impl BuildBackendKind {
             BuildBackendKind::Cmake => "cmake",
             BuildBackendKind::Cargo => "cargo",
             BuildBackendKind::Zig => "zig",
+            BuildBackendKind::Javac => "javac",
             BuildBackendKind::Custom => "custom",
         }
     }
 }
 
-/// Run backend selector (`[run] backend`).  Only QEMU exists in v1.
+/// Run backend selector (`[run] backend`).
+///
+/// D31: `Jvm` added for Java language module (P-F1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RunBackendKind {
     #[serde(rename = "qemu")]
     Qemu,
+    /// Java Virtual Machine (`java -jar` / classpath).  D31: P-F1 run backend for Java.
+    #[serde(rename = "jvm")]
+    Jvm,
 }
 
 impl Default for RunBackendKind {
@@ -126,6 +142,7 @@ impl RunBackendKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             RunBackendKind::Qemu => "qemu",
+            RunBackendKind::Jvm => "jvm",
         }
     }
 }
@@ -155,10 +172,14 @@ impl BootProtocol {
 }
 
 /// Debug backend selector (`[debug] backend`).
+///
+/// P-F2 (future): JDWP will be added as a second debug backend for Java.
+/// This round (P-F1) does NOT add JDWP.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DebugBackendKind {
     #[serde(rename = "gdb")]
     Gdb,
+    // P-F2: #[serde(rename = "jdwp")] Jdwp,
 }
 
 impl Default for DebugBackendKind {
@@ -1079,5 +1100,100 @@ model    = ""
     fn missing_directory_is_not_found() {
         let err = ProjectConfig::load_or_default("/definitely/not/here/at/all").unwrap_err();
         assert_eq!(err.code, ErrorCode::NotFound);
+    }
+
+    // --- D31 / P-F1: Java language module round-trip tests ---
+
+    #[test]
+    fn java_language_roundtrip_serde() {
+        // language = "java" must serialize and deserialize correctly
+        let input = "schema = 1\n[project]\nlanguage = \"java\"\n";
+        let cfg = ProjectConfig::from_toml_str(input).unwrap();
+        assert_eq!(cfg.project.language, Language::Java);
+
+        // Round-trip: serialize back and parse again
+        let serialized = toml::to_string(&cfg).unwrap();
+        assert!(serialized.contains("java"), "serialized must contain 'java': {serialized}");
+        let cfg2 = ProjectConfig::from_toml_str(&serialized).unwrap();
+        assert_eq!(cfg2.project.language, Language::Java);
+    }
+
+    #[test]
+    fn javac_build_backend_roundtrip_serde() {
+        let input = "schema = 1\n[build]\nbackend = \"javac\"\n";
+        let cfg = ProjectConfig::from_toml_str(input).unwrap();
+        assert_eq!(cfg.build.backend, BuildBackendKind::Javac);
+        assert_eq!(cfg.build.backend.as_str(), "javac");
+
+        let serialized = toml::to_string(&cfg).unwrap();
+        assert!(serialized.contains("javac"), "serialized must contain 'javac': {serialized}");
+        let cfg2 = ProjectConfig::from_toml_str(&serialized).unwrap();
+        assert_eq!(cfg2.build.backend, BuildBackendKind::Javac);
+    }
+
+    #[test]
+    fn jvm_run_backend_roundtrip_serde() {
+        let input = "schema = 1\n[run]\nbackend = \"jvm\"\n";
+        let cfg = ProjectConfig::from_toml_str(input).unwrap();
+        assert_eq!(cfg.run.backend, RunBackendKind::Jvm);
+        assert_eq!(cfg.run.backend.as_str(), "jvm");
+
+        let serialized = toml::to_string(&cfg).unwrap();
+        assert!(serialized.contains("jvm"), "serialized must contain 'jvm': {serialized}");
+        let cfg2 = ProjectConfig::from_toml_str(&serialized).unwrap();
+        assert_eq!(cfg2.run.backend, RunBackendKind::Jvm);
+    }
+
+    #[test]
+    fn java_full_manifest_roundtrip() {
+        // A complete Java project manifest (P-F1 shape)
+        let input = r#"
+schema = 1
+
+[project]
+name = "javaproj"
+language = "java"
+arch = "x86_64"
+
+[build]
+backend = "javac"
+cwd = "."
+artifacts = ["build/Main.class"]
+
+[run]
+backend = "jvm"
+timeout_ms = 10000
+"#;
+        let cfg = ProjectConfig::from_toml_str(input).unwrap();
+        assert_eq!(cfg.project.language, Language::Java);
+        assert_eq!(cfg.project.name.as_deref(), Some("javaproj"));
+        assert_eq!(cfg.build.backend, BuildBackendKind::Javac);
+        assert_eq!(cfg.run.backend, RunBackendKind::Jvm);
+        assert_eq!(cfg.run.timeout_ms, 10000);
+
+        // Debug backend still defaults to Gdb (JDWP is P-F2)
+        assert_eq!(cfg.debug.backend, DebugBackendKind::Gdb);
+    }
+
+    #[test]
+    fn unknown_language_value_still_rejected() {
+        let input = "schema = 1\n[project]\nlanguage = \"kotlin\"\n";
+        let err = ProjectConfig::from_toml_str(input).unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidConfig);
+        assert!(err.message.contains("kotlin") || err.message.contains("unknown"), "{err}");
+    }
+
+    #[test]
+    fn unknown_build_backend_still_rejected() {
+        let input = "schema = 1\n[build]\nbackend = \"gradle\"\n";
+        let err = ProjectConfig::from_toml_str(input).unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidConfig);
+    }
+
+    #[test]
+    fn unknown_run_backend_still_rejected() {
+        let input = "schema = 1\n[run]\nbackend = \"docker\"\n";
+        let err = ProjectConfig::from_toml_str(input).unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidConfig);
     }
 }

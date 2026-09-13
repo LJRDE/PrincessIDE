@@ -1,0 +1,52 @@
+# Language module manifest for Java (PrincessIDE M13/P-F1)
+#
+# This file describes the Java language support for PrincessIDE.
+# It is part of the language module layer (M13) and demonstrates
+# the "one language = one manifest + one adapter set" architecture
+# with Java as the first non-kernel language instance.
+#
+# Decisions referenced:
+# - D31: Language modules are pluggable; Java is first instance
+# - D4: C+asm remains primary path; Java is optional module
+# - D17: LSP protocol stack delegation (jdtls, not reimplemented)
+# - D19: Network is slow; javac is zero-download
+# - P-F1: Build (javac) + Run (JVM) + LSP (jdtls)
+
+[language]
+id = "java"
+displayName = "Java"
+extensions = [".java"]
+description = "Java language support with javac build and JVM runtime"
+
+[language.lsp]
+# D31/D17: jdtls is the language server for Java
+# PRINCESSIDE_LANG_SERVICE_JDTLS env var can override this
+command = "jdtls"
+args = []
+# Java does not use .clangd files (that's C/C++ specific)
+dot_clangd_strategy = "none"
+# Java does not use compile_commands.json (that's clangd specific)
+compile_commands_strategy = "none"
+
+[language.build]
+# D31/P-F1: javac is the build backend for Java (zero download, D19)
+backend = "javac"
+# No CDB generation for Java (javac doesn't need it)
+cdb_generation = false
+# No .clangd generation for Java (jdtls doesn't use it)
+dot_clangd_generation = false
+# No need to clean before CDB (no CDB for Java)
+clean_before_cdb = false
+
+[language.run]
+# D31/P-F1: JVM is the runtime for Java
+backend = "jvm"
+# JVM does not use serial output (that's QEMU specific)
+serial_args = []
+# JVM does not have triple faults (that's x86 specific)
+triple_fault_args = []
+
+[language.debug]
+# P-F2 (future): JDWP support will be added as a separate language module
+backend = "jdwp"
+# TODO(P-F2): JDWP configuration will be added here

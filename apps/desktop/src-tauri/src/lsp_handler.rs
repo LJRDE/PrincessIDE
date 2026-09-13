@@ -42,13 +42,14 @@ impl LspRegistry {
     }
 }
 
-/// `princess:lsp:start` — start a clangd language server for a project.
+/// `princess:lsp:start` — start a language server for a project.
 ///
 /// Args: `{ projectRoot: string }`
 ///
 /// Returns: `{ serverId, command, args }`
 ///
-/// Per D18: uses `clangd-16`, not the default `clangd`.
+/// Per D17: The engine owns the language server process lifecycle.
+/// Per D31: Language modules are pluggable; Java uses jdtls, C uses clangd-16.
 pub fn lsp_start(
     args: &Value,
     app: &AppHandle,
@@ -69,27 +70,39 @@ pub fn lsp_start(
         );
     }
 
-    // D18: clangd-16, not unversioned clangd.
-    let clangd_bin = find_clangd();
+    // D31: Detect language from project manifest to choose the right language server
+    let language = detect_language(&root);
+    let (server_bin, server_args) = match language.as_str() {
+        "java" => {
+            // D31/P-F1: Java uses jdtls
+            let jdtls_bin = find_jdtls();
+            let args_vec = vec![]; // jdtls doesn't need special args for basic operation
+            (jdtls_bin, args_vec)
+        }
+        _ => {
+            // D18: Default to clangd-16 for C/C++ projects
+            let clangd_bin = find_clangd();
+            let args_vec = vec![
+                format!("--compile-commands-dir={}", root.display()),
+                format!("--resource-dir={}", root.display()),
+                "--pch-storage=memory".to_string(),
+                "--log=error".to_string(),
+                "-j=2".to_string(),
+            ];
+            (clangd_bin, args_vec)
+        }
+    };
+
     let server_id = {
         let n = registry.counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
         format!("lsp-{:04x}", n)
     };
 
-    // Build the clangd args.
-    let args_vec = vec![
-        format!("--compile-commands-dir={}", root.display()),
-        format!("--resource-dir={}", root.display()),
-        "--pch-storage=memory".to_string(),
-        "--log=error".to_string(),
-        "-j=2".to_string(),
-    ];
+    let cmd_display = format!("{} {}", server_bin, server_args.join(" "));
 
-    let cmd_display = format!("{} {}", clangd_bin, args_vec.join(" "));
-
-    // Spawn the clangd process.
-    let mut child = match Command::new(&clangd_bin)
-        .args(&args_vec)
+    // Spawn the language server process.
+    let mut child = match Command::new(&server_bin)
+        .args(&server_args)
         .current_dir(&root)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -100,7 +113,7 @@ pub fn lsp_start(
         Err(e) => {
             return err(
                 ShellErrorCode::Internal,
-                format!("failed to start {}: {e}", clangd_bin),
+                format!("failed to start {}: {e}", server_bin),
                 format!("command: {cmd_display}\nproject root: {}", root.display()),
             );
         }
@@ -147,8 +160,8 @@ pub fn lsp_start(
 
     ok(json!({
         "serverId": server_id,
-        "command": clangd_bin,
-        "args": args_vec,
+        "command": server_bin,
+        "args": server_args,
     }))
 }
 
@@ -266,6 +279,54 @@ fn find_clangd() -> String {
     }
     // Fallback to PATH.
     "clangd-16".to_string()
+}
+
+/// Find the jdtls binary for Java language support (D31/P-F1).
+fn find_jdtls() -> String {
+    // Check env var first.
+    if let Ok(bin) = std::env::var("PRINCESSIDE_LANG_SERVICE_JDTLS") {
+        return bin;
+    }
+    // Check the toolchain launcher dir.
+    if let Some(bin) = princess_build::launcher_dir() {
+        let candidate = bin.parent().unwrap_or(&bin).join("bin/jdtls");
+        if candidate.is_file() {
+            return candidate.display().to_string();
+        }
+    }
+    // Fallback to PATH.
+    "jdtls".to_string()
+}
+
+/// Detect the project language from princess.toml (D31).
+/// Returns "c" as default if no manifest or language field found.
+fn detect_language(project_root: &std::path::Path) -> String {
+    let manifest_path = project_root.join("princess.toml");
+    if !manifest_path.is_file() {
+        return "c".to_string(); // Default to C for projects without manifest
+    }
+
+    // Read and parse the manifest
+    let content = match std::fs::read_to_string(&manifest_path) {
+        Ok(c) => c,
+        Err(_) => return "c".to_string(),
+    };
+
+    // Simple TOML parsing for language field
+    // Look for: language = "java" or language = "c"
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("language") && trimmed.contains('=') {
+            if let Some(value) = trimmed.split('=').nth(1) {
+                let value = value.trim().trim_matches('"').trim();
+                if !value.is_empty() {
+                    return value.to_string();
+                }
+            }
+        }
+    }
+
+    "c".to_string() // Default
 }
 
 /// Read an LSP stream (stdout or stderr) and emit events.

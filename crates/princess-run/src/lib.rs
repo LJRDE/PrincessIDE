@@ -35,6 +35,7 @@
 
 pub mod backend;
 pub mod exit;
+pub mod jvm;
 pub mod process;
 pub mod qemu;
 pub mod serial;
@@ -44,6 +45,7 @@ pub use backend::{
     QemuBackend, ResolvedQemuBackend, RunOptions, RunSummary, SymbolizeFn, MAX_FAULT_EVENTS,
 };
 pub use exit::{detect_triple_fault, triple_fault_in_file, QemuEvidence};
+pub use jvm::JvmBackend;
 pub use process::{
     group_alive, kill_group, kill_group_blocking, which, FakeRunner, Pipe, ProcessOutcome,
     ProcessRunner, RunnerConfig, SpawnSpec, StreamChunk, SystemRunner,

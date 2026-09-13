@@ -40,6 +40,7 @@ pub mod artifacts;
 pub mod backend;
 pub mod clangd;
 pub mod diagnostics;
+pub mod javac;
 pub mod manifest;
 pub mod process;
 pub mod toolchain;
@@ -56,6 +57,7 @@ pub use clangd::{
     validate_dot_clangd, CompileCommand, CompileCommands, DotClangd, WrapperShim, DEFAULT_TRIPLE,
     GCC_ONLY_FLAG_BLACKLIST, GCC_ONLY_FLAGR_BLACKLIST, LANG_SERVICE_TOOL, NOSTD_INCLUDE_FLAG,
 };
+pub use javac::JavacBackend;
 pub use manifest::{
     lang_service_command_with_fallback as manifest_lang_service_command_with_fallback,
     should_clean_before_cdb, should_generate_compile_commands, should_generate_dot_clangd,

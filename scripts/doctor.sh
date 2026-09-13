@@ -287,6 +287,25 @@ check_pkgconfig 'javascriptcoregtk-4.1'  javascriptcoregtk-4.1   'libjavascriptc
 check_pkgconfig 'libsoup-3.0'            libsoup-3.0             'libsoup-3.0-dev'
 check_pkgconfig 'librsvg-2.0'            librsvg-2.0             'librsvg2-dev'
 
+# --- Java language service (D31/P-F1) ----------------------------------------
+out "-------------------------------------------------------------------------------"
+out "# Java 语言服务（D31/P-F1：jdtls）"
+
+# jdtls is a language server (long-running process), so we check if the binary exists
+# and is executable, then verify Java version
+if [ -x "$PRINCESSIDE_JDTLS" ]; then
+    outf '%-22s %-10s %s\n' 'jdtls (LSP)' "ok" "binary present"
+    outf '%-22s %-10s %s\n' '' '' "$PRINCESSIDE_JDTLS"
+    present=$((present + 1))
+else
+    outf '%-22s %-10s %s\n' 'jdtls (LSP)' "MISSING" "(required: $PRINCESSIDE_JDTLS)"
+    missing+=("jdtls (LSP)")
+fi
+
+# Check Java version (required >= 17 for jdtls)
+check_tool_relaxed 'java (JDK)' java java 17 1
+check_tool_relaxed 'javac' javac javac 17 1
+
 out "-------------------------------------------------------------------------------"
 
 if [ "${#missing[@]}" -ne 0 ]; then

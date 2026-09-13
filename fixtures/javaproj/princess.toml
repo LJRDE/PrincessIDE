@@ -1,0 +1,33 @@
+# PrincessIDE Java fixture manifest (D31/P-F1)
+#
+# This is the canonical Java project manifest for PrincessIDE.
+# It demonstrates the language module layer (M13) with Java as the first instance.
+#
+# Decisions referenced:
+# - D31: Language modules are pluggable, Java is first instance
+# - D4: C+asm remains primary path; Java is optional module
+# - D17: LSP protocol stack delegation (jdtls)
+# - P-F1: Build (javac) + Run (JVM) + LSP (jdtls)
+
+schema = 1
+
+[project]
+name = "javaproj"
+language = "java"
+arch = "x86_64"
+
+[build]
+backend = "javac"
+cwd = "."
+artifacts = ["build/Main.class"]
+# javac does not need compile_commands.json (no clangd for Java)
+# compile_commands is omitted (defaults to None for Java)
+
+[run]
+backend = "jvm"
+timeout_ms = 10000
+# JVM does not use QEMU args, kernel, boot, or serial
+
+[debug]
+# JDWP is P-F2 (future); this fixture does not configure debug
+backend = "gdb"  # placeholder; JDWP will be added in P-F2

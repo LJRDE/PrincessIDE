@@ -125,7 +125,7 @@ schema = 1
 
 [project]
 name = "mykernel"
-language = "c"          # c | asm | cpp | rust | zig
+language = "c"          # c | asm | cpp | rust | zig | java
 arch = "x86_64"
 
 [build]
