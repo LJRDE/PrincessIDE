@@ -56,3 +56,11 @@ sha2 = "0.10"
 # Tauri debug binaries are enormous; keep the shell buildable on a 4 GB / no-swap
 # machine (D16 memory discipline).
 debug = 1
+
+[profile.release]
+# Portable packaging (scripts/package-portable.sh) ships this binary, so strip it
+# here instead of relying on the packager to remember: measured 13.80 MB
+# unstripped -> 8.93 MB stripped.  LTO / opt-level="z" are deliberately NOT set —
+# they cost minutes of build time and hundreds of MB of RSS for headroom we do
+# not need against the 15 MB budget (D22 memory discipline).
+strip = true

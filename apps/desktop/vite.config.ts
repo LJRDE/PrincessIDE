@@ -14,6 +14,10 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     target: 'es2022',
-    sourcemap: true,
+    // Tauri *embeds* `dist/` into the release binary (tauri.conf.json
+    // `frontendDist`), so a source map here is not a debug convenience — it is
+    // ~2 MB of shipped weight inside the executable.  Opt back in with
+    // PRINCESSIDE_SOURCEMAP=1 when a build actually needs to be debugged.
+    sourcemap: process.env['PRINCESSIDE_SOURCEMAP'] === '1',
   },
 });

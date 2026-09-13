@@ -61,3 +61,6 @@ fixtures/qemu-monitor/*.log
 
 # Stray compile artifacts (agents sometimes compile in the repo root).
 a.out
+
+# 便携包产物（scripts/package-portable.sh 的输出目录）
+dist-packages/
