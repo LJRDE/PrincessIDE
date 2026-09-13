@@ -29,6 +29,24 @@ const dirSelectorFn = isTauri()
   : undefined;
 
 /**
+ * §3 fs: the editor's native file picker.
+ *
+ * Same seam as `dirSelectorFn` — wired only inside the Tauri webview, so a
+ * browser preview keeps working through the editor's own path box with no
+ * dialog.  Wrapped as a `FileSelectorFn` so the editor view stays testable by
+ * injection (D17 pattern).
+ */
+const fileSelectorFn = isTauri()
+  ? async (): Promise<string | null> => {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const result = await open({ directory: false, multiple: false });
+      if (result === null) return null;
+      if (Array.isArray(result)) return result[0] ?? null;
+      return result;
+    }
+  : undefined;
+
+/**
  * Subscribe to the engine's event stream.
  *
  * Only the Tauri webview has `listen`; a plain browser preview passes nothing
@@ -41,6 +59,7 @@ const app = mountApp(root, {
     ? (handler) => listen<unknown>(EVENT_CHANNEL, (event) => handler({ payload: event.payload }))
     : undefined,
   dirSelectorFn,
+  fileSelectorFn,
 });
 
 // Handy for manual poking in the webview devtools; not part of any contract.

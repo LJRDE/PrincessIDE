@@ -14,6 +14,7 @@ pub mod contract;
 pub mod debug_handler;
 pub mod doctor;
 pub mod events;
+pub mod fs_handler;
 pub mod lsp_handler;
 pub mod ops;
 pub mod project_handler;

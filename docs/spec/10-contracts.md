@@ -108,6 +108,9 @@
 - `princess:debug:attach` / `setBreakpoints` / `continue` / `stepOver` / `stepInto` / `stackTrace` / `scopes` / `variables` / `readMemory` / `writeMemory` / `disassemble` / `registers`
 - `princess:op:cancel`（统一取消入口，参数 `opId`）
 - `princess:op:replay`（从 `seq` 重放事件，用于重连 UI）
+- **文件读写（编辑器最小可用集，fs 域）**——路径解析后必须落在已打开的工程根内，越界返回 E_SANDBOX_DENIED：
+  - `princess:fs:read` `{ projectRoot, path }` → `{ path, bytes, content, truncated }`（读 UTF-8 文本文件；不存在返回 E_NOT_FOUND）
+  - `princess:fs:write` `{ projectRoot, path, content }` → `{ path, bytes, created }`（先写临时文件再 rename，避免半截文件；越界返回 E_SANDBOX_DENIED）
 - **语言服务桥（D17 裁决，`lsp` 域）**——引擎负责 clangd 进程生命周期与帧封装，前端只做编辑器交互：
   - `princess:lsp:start` `{ projectRoot }` → `{ serverId, command, args }`（引擎按 **D7** 生成/校验 `.clangd`、按 **D8** 保证 CDB，并按 **D18** 使用 `clangd-16`）
   - `princess:lsp:send` `{ serverId, message }` → `{}`（`message` 为**不带帧头**的 JSON-RPC 原文，帧封装由引擎负责）

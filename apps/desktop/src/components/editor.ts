@@ -52,6 +52,13 @@ function hasExt(file: string, exts: readonly string[]): boolean {
  * (research report §3: "不要拿它当汇编的 IDE 后端"), so `.S`/`.asm` get a
  * syntax-only GAS stream mode and are **not** sent to the language server.
  */
+/**
+ * Native "pick a file" seam (same D17 injection pattern as `DirSelectorFn`).
+ * In the Tauri webview this is `tauri-plugin-dialog`; in a plain browser
+ * preview it is absent and the editor falls back to its path text input.
+ */
+export type FileSelectorFn = () => Promise<string | null>;
+
 export function languageForFile(filename: string): {
   languageId: EditorLanguageId;
   extension: Extension;

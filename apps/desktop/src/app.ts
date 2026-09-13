@@ -33,6 +33,7 @@ import { createInitialState, replayEvents, type IdeState } from './state/eventSt
 import { loadAllBundledFixtures } from './state/fixtureLoader.js';
 import { subscribeToLiveStream, type LiveStreamHandle } from './state/liveStream.js';
 import type { ActionPanelCallbacks, DirSelectorFn } from './components/actionPanel.js';
+import type { FileSelectorFn } from './components/editor.js';
 import type { DebugPanelCallbacks } from './components/debugPanel.js';
 import type { ToolTableState } from './components/toolTable.js';
 
@@ -68,6 +69,11 @@ export interface MountAppOptions {
    * preview: only the text input path entry is rendered (no "Browse…" button).
    */
   dirSelectorFn?: DirSelectorFn;
+  /**
+   * Injected file picker for the editor (same D17 seam as `dirSelectorFn`).
+   * Absent in a browser preview, where the editor's path box is the entry point.
+   */
+  fileSelectorFn?: FileSelectorFn;
 }
 
 export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppHandles {
@@ -125,6 +131,19 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
   const actionMount = mounted.find((m) => m.view.id === 'action-panel');
   const debugMount = mounted.find((m) => m.view.id === 'debug-panel');
   const toolchainMount = mounted.find((m) => m.view.id === 'toolchain-panel');
+  const editorMount = mounted.find((m) => m.view.id === 'editor-panel');
+
+  /**
+   * Hand the editor the root every read/write is confined to.  Without it the
+   * editor falls back to the picked file's own directory, which is fine for
+   * scratch editing but means "open project" would not actually widen anything.
+   */
+  const editorSetRoot = (root: string): void => {
+    const r = editorMount?.result as Record<string, unknown> | undefined;
+    if (r && typeof r['setProjectRoot'] === 'function') {
+      (r['setProjectRoot'] as (root: string) => void)(root);
+    }
+  };
 
   /** Show an IPC error explicitly (contract §0.4: never blank, never silent). */
   const showIpcError = (label: string, err: { code: string; message: string; detail: string }): void => {
@@ -195,7 +214,12 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
         return;
       }
       void projectOpen({ path }).then((res) => {
-        if (!res.ok) showIpcError('princess:project:open', res.error);
+        if (!res.ok) {
+          showIpcError('princess:project:open', res.error);
+          return;
+        }
+        // The editor confines its reads and writes to this root (contract §3 fs).
+        editorSetRoot(res.data.root);
       });
     },
   };
@@ -208,6 +232,14 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
     }
     if (typeof r['setOptions'] === 'function') {
       (r['setOptions'] as (o: { dirSelectorFn?: DirSelectorFn }) => void)({ dirSelectorFn: options.dirSelectorFn });
+    }
+  }
+
+  // Wire the editor's native file picker (absent outside Tauri).
+  if (editorMount) {
+    const r = editorMount.result as Record<string, unknown>;
+    if (typeof r['setFileSelector'] === 'function' && options.fileSelectorFn) {
+      (r['setFileSelector'] as (fn: FileSelectorFn) => void)(options.fileSelectorFn);
     }
   }
 

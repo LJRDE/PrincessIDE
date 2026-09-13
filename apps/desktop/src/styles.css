@@ -222,6 +222,31 @@ details pre {
   min-height: 220px;
 }
 
+/* Toolbar for the editor's §3 fs controls (Open File… / Save / path box). */
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.editor-toolbar button {
+  flex: 0 0 auto;
+}
+
+.editor-path {
+  flex: 1 1 220px;
+  min-width: 160px;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+}
+
+/* The status line doubles as the error channel: contract §0.4 forbids silence. */
+[data-testid='editor-status'][data-error='true'] {
+  color: var(--danger, #e06c75);
+}
+
 .cm-editor {
   min-height: 220px;
 }

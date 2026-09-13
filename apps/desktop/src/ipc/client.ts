@@ -117,6 +117,13 @@ export const debugStackTrace = (threadId?: number, invokeFn?: InvokeFn) =>
 export const debugRegisters = (threadId?: number, invokeFn?: InvokeFn) =>
   call('princess:debug:registers', { threadId }, invokeFn);
 
+// §3 fs: the editor's file I/O.  `projectRoot` is the confinement boundary —
+// the engine refuses any path that resolves outside it with E_SANDBOX_DENIED.
+export const fsRead = (projectRoot: string, path: string, invokeFn?: InvokeFn) =>
+  call('princess:fs:read', { projectRoot, path }, invokeFn);
+export const fsWrite = (projectRoot: string, path: string, content: string, invokeFn?: InvokeFn) =>
+  call('princess:fs:write', { projectRoot, path, content }, invokeFn);
+
 // P3-C: LSP commands
 export const lspStart = (projectRoot: string, invokeFn?: InvokeFn) =>
   call('princess:lsp:start', { projectRoot }, invokeFn);

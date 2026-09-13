@@ -76,6 +76,9 @@ pub async fn dispatch(cmd: &str, args: Value, app: &AppHandle, state: &AppState)
         Route::Implemented("princess:tools:detect") => tools_detect(app, state).await,
         Route::Implemented("princess:op:cancel") => op_cancel(&args, app, state),
         Route::Implemented("princess:op:replay") => op_replay(&args, state),
+        // §3 fs: the editor's file I/O (open a real file, save it back).
+        Route::Implemented("princess:fs:read") => crate::fs_handler::fs_read(&args),
+        Route::Implemented("princess:fs:write") => crate::fs_handler::fs_write(&args),
         // P3-C: build commands
         Route::Implemented("princess:build:start") => {
             crate::build_handler::build_start(&args, app, &state.bus, &state.ops).await

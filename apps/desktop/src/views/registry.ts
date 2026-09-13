@@ -78,7 +78,8 @@ export function listViews(): readonly ViewDescriptor[] {
 
 import { renderActionPanel, type ActionPanelCallbacks, type DirSelectorFn } from '../components/actionPanel.js';
 import { renderToolTable, type ToolTableState } from '../components/toolTable.js';
-import { createEditor } from '../components/editor.js';
+import { createEditor, type FileSelectorFn } from '../components/editor.js';
+import { fsRead, fsWrite } from '../ipc/client.js';
 import {
   renderDebugPanel as renderEventDebugPanel,
   renderDiagnostics,
@@ -147,6 +148,37 @@ registerView({
   title: 'Editor (CodeMirror 6)',
   testid: 'editor-panel',
   mount(host) {
+    // --- toolbar: open / save ------------------------------------------------
+    // Until §3 gained fs:read / fs:write there was no way to get a real file
+    // into this editor, so the panel was a demo buffer with no I/O.  These two
+    // buttons (plus the path box, which is the only entry point in a browser
+    // preview) are that gap closed.
+    const bar = document.createElement('div');
+    bar.className = 'editor-toolbar';
+
+    const openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.dataset['testid'] = 'editor-open-btn';
+    openBtn.textContent = 'Open File…';
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.dataset['testid'] = 'editor-save-btn';
+    saveBtn.textContent = 'Save';
+
+    const pathInput = document.createElement('input');
+    pathInput.type = 'text';
+    pathInput.className = 'editor-path';
+    pathInput.dataset['testid'] = 'editor-path-input';
+    pathInput.placeholder = 'file path (absolute, or relative to the project root)';
+
+    const status = document.createElement('span');
+    status.className = 'muted';
+    status.dataset['testid'] = 'editor-status';
+
+    bar.append(openBtn, saveBtn, pathInput, status);
+    host.appendChild(bar);
+
     const editorHost = document.createElement('div');
     editorHost.className = 'editor-host';
     host.appendChild(editorHost);
@@ -168,11 +200,122 @@ void kmain(void) {
     refkernel_fault_probe();
 }
 `;
-    const editor = createEditor(editorHost, { filename: 'kernel.c', doc: DEMO_SOURCE });
+    let editor = createEditor(editorHost, { filename: 'scratch.c', doc: DEMO_SOURCE });
+    let currentPath = '';
+    let projectRoot = '';
+    let fileSelectorFn: FileSelectorFn | undefined;
+    let dirty = false;
+
+    const setStatus = (text: string, isError = false): void => {
+      status.textContent = text;
+      status.dataset['error'] = isError ? 'true' : 'false';
+    };
+
+    const refreshStatus = (): void => {
+      if (!currentPath) {
+        setStatus('scratch buffer — use Open File… to load one');
+        return;
+      }
+      setStatus(`${dirty ? '● unsaved — ' : ''}${currentPath}`);
+    };
+
+    /** Recreate the CodeMirror instance so the language mode follows the file. */
+    const loadIntoEditor = (filename: string, doc: string): void => {
+      editor.destroy();
+      editorHost.textContent = '';
+      editor = createEditor(editorHost, { filename, doc });
+      editor.view.dom.addEventListener('input', () => {
+        dirty = true;
+        refreshStatus();
+      });
+    };
+
+    // The confinement root: the opened project when there is one, otherwise the
+    // directory of the file the user just picked.  Both are user-chosen, and the
+    // engine refuses anything that resolves outside whichever is in force.
+    const rootFor = (path: string): string => {
+      if (projectRoot) return projectRoot;
+      const cut = path.lastIndexOf('/');
+      return cut > 0 ? path.slice(0, cut) : '/';
+    };
+
+    const openPath = async (path: string): Promise<void> => {
+      const res = await fsRead(rootFor(path), path);
+      if (!res.ok) {
+        setStatus(`open failed: ${res.error.message}`, true);
+        return;
+      }
+      currentPath = res.data.path;
+      loadIntoEditor(currentPath.split('/').pop() ?? 'untitled.c', res.data.content);
+      dirty = false;
+      pathInput.value = currentPath;
+      const note = res.data.truncated ? ' — truncated at the 8 MiB cap' : '';
+      setStatus(`${currentPath} — ${res.data.bytes} bytes${note}`);
+    };
+
+    const save = async (): Promise<void> => {
+      if (!currentPath) {
+        setStatus('nothing to save — open a file first', true);
+        return;
+      }
+      const res = await fsWrite(rootFor(currentPath), currentPath, editor.getDoc());
+      if (!res.ok) {
+        setStatus(`save failed: ${res.error.message}`, true);
+        return;
+      }
+      dirty = false;
+      setStatus(
+        `saved ${res.data.path} — ${res.data.bytes} bytes${res.data.created ? ' (created)' : ''}`,
+      );
+    };
+
+    openBtn.addEventListener('click', () => {
+      void (async () => {
+        if (fileSelectorFn) {
+          const picked = await fileSelectorFn();
+          if (picked) await openPath(picked);
+          return;
+        }
+        const typed = pathInput.value.trim();
+        if (typed) await openPath(typed);
+        else setStatus('type a path — no native file dialog outside Tauri', true);
+      })();
+    });
+
+    saveBtn.addEventListener('click', () => {
+      void save();
+    });
+
+    pathInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        const typed = pathInput.value.trim();
+        if (typed) void openPath(typed);
+      }
+    });
+
+    // Ctrl/Cmd+S is bound on the document rather than the editor so it fires
+    // whether or not CodeMirror currently holds focus.
+    const onKeydown = (event: KeyboardEvent): void => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void save();
+      }
+    };
+    document.addEventListener('keydown', onKeydown);
+
+    refreshStatus();
 
     return {
       render() { /* CodeMirror manages its own state */ },
-      destroy() { editor.destroy(); },
+      setFileSelector(fn: FileSelectorFn) { fileSelectorFn = fn; },
+      setProjectRoot(root: string) { projectRoot = root; },
+      currentPath: () => currentPath,
+      openPath,
+      save,
+      destroy() {
+        document.removeEventListener('keydown', onKeydown);
+        editor.destroy();
+      },
     };
   },
 });

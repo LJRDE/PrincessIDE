@@ -31,6 +31,10 @@ pub const CONTRACT_COMMANDS: &[&str] = &[
     "princess:debug:registers",
     "princess:op:cancel",
     "princess:op:replay",
+    // The editor's minimum viable set: read a file into the buffer, write it
+    // back.  Both confine the resolved path to the opened project root.
+    "princess:fs:read",
+    "princess:fs:write",
     // Added by the D17 amendment (engine owns the clangd process + framing).
     "princess:lsp:start",
     "princess:lsp:send",
@@ -46,6 +50,9 @@ pub const IMPLEMENTED_COMMANDS: &[&str] = &[
     "princess:tools:detect",
     "princess:op:cancel",
     "princess:op:replay",
+    // §3 fs — what makes the editor a text editor rather than a demo buffer.
+    "princess:fs:read",
+    "princess:fs:write",
     // P3-C additions
     "princess:build:start",
     "princess:build:cancel",
@@ -182,7 +189,11 @@ mod tests {
             assert_eq!(cmd.matches(':').count(), 2, "{cmd} must be princess:<domain>:<action>");
             assert!(seen.insert(*cmd), "duplicate command {cmd}");
         }
-        assert_eq!(seen.len(), 24, "the v1 set is 21 commands + 3 lsp commands (D17)");
+        assert_eq!(
+            seen.len(),
+            26,
+            "the v1 set is 21 commands + 3 lsp commands (D17) + 2 fs commands (§3 editor I/O)"
+        );
     }
 
     #[test]

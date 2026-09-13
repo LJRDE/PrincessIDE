@@ -110,7 +110,18 @@ describe('IPC contract alignment (docs/spec/10-contracts.md §3)', () => {
       expect(report.tsCommands).toContain(cmd);
       expect(report.rustCommands).toContain(cmd);
     }
-    expect(report.specCommands).toHaveLength(24);
+    // 24 at the D17 amendment, +2 for the §3 fs commands that made the editor
+    // able to open and save real files.  Pinned so a command can never appear
+    // in the spec without this test noticing.
+    expect(report.specCommands).toHaveLength(26);
+  });
+
+  it('covers the fs domain the editor needs to open and save files', () => {
+    for (const cmd of ['princess:fs:read', 'princess:fs:write']) {
+      expect(report.specCommands).toContain(cmd);
+      expect(report.tsCommands).toContain(cmd);
+      expect(report.rustCommands).toContain(cmd);
+    }
   });
 
   it('is not confused by prose, apostrophes or Rust type annotations', () => {

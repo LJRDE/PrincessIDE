@@ -44,6 +44,11 @@ export const IPC_COMMANDS = [
   // §3 op
   'princess:op:cancel',
   'princess:op:replay',
+  // §3 fs (the editor's minimum viable set: open a file, save it back).
+  // Every path is resolved and then confined to the opened project root —
+  // escaping it is E_SANDBOX_DENIED, not a silent read of /etc.
+  'princess:fs:read',
+  'princess:fs:write',
   // §3 lsp (D17 amendment: engine owns the clangd process and the frame
   // headers; the frontend only drives the editor's language-service features)
   'princess:lsp:start',
@@ -156,6 +161,44 @@ export interface OpReplayData {
   fromSeq: number;
   /** Highest seq currently held by the engine's ring buffer. */
   lastSeq: number;
+}
+
+// --- §3 fs: the editor's minimum viable set -------------------------------
+// These two commands are what turn the shell from "a CodeMirror demo buffer"
+// into something you can actually edit files with.  `path` may be absolute or
+// relative to `projectRoot`; the engine resolves it and then refuses anything
+// that escapes that root with E_SANDBOX_DENIED.
+
+export interface FsReadArgs {
+  /** Root the read must stay inside (normally the opened project's root). */
+  projectRoot: string;
+  /** Absolute, or relative to `projectRoot`. */
+  path: string;
+}
+
+export interface FsReadData {
+  /** Resolved absolute path actually read. */
+  path: string;
+  /** Size in bytes. */
+  bytes: number;
+  /** UTF-8 text.  Invalid sequences are replaced, never thrown on. */
+  content: string;
+  /** True when the file exceeded the engine's read cap and `content` is a prefix. */
+  truncated: boolean;
+}
+
+export interface FsWriteArgs {
+  projectRoot: string;
+  path: string;
+  content: string;
+}
+
+export interface FsWriteData {
+  path: string;
+  /** Bytes written. */
+  bytes: number;
+  /** True when the write created a file that did not exist before. */
+  created: boolean;
 }
 
 export interface LspStartArgs {
@@ -370,6 +413,8 @@ export interface IpcMap {
   'princess:tools:detect': { args: Record<string, never>; data: ToolsDetectData };
   'princess:op:cancel': { args: OpCancelArgs; data: OpCancelData };
   'princess:op:replay': { args: OpReplayArgs; data: OpReplayData };
+  'princess:fs:read': { args: FsReadArgs; data: FsReadData };
+  'princess:fs:write': { args: FsWriteArgs; data: FsWriteData };
   'princess:build:start': { args: BuildStartArgs; data: BuildStartData };
   'princess:build:cancel': { args: BuildCancelArgs; data: BuildCancelData };
   'princess:run:start': { args: RunStartArgs; data: RunStartData };
