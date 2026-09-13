@@ -11,6 +11,8 @@ members = [
     "crates/princess-ai",
     "crates/princess-view",
     "crates/princess-lang",
+    "crates/princess-bisect",
+    "crates/princess-plugins",
 ]
 
 [workspace.package]

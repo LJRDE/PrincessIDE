@@ -1,0 +1,15 @@
+[package]
+name = "princess-plugins"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "PrincessIDE M11 plugin layer — declarative manifests, discovery and a capability model (no native code loading)"
+
+[dependencies]
+princess-core = { path = "../princess-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }

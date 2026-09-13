@@ -429,6 +429,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "princess-bisect"
+version = "0.1.0"
+dependencies = [
+ "princess-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "princess-build"
 version = "0.1.0"
 dependencies = [
@@ -473,6 +482,16 @@ dependencies = [
 
 [[package]]
 name = "princess-lang"
+version = "0.1.0"
+dependencies = [
+ "princess-core",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
+name = "princess-plugins"
 version = "0.1.0"
 dependencies = [
  "princess-core",

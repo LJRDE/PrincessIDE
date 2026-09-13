@@ -1,0 +1,14 @@
+[package]
+name = "princess-bisect"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "PrincessIDE M10 orchestrator — thin git CLI wrapper plus `git bisect run` over build + QEMU + assertion"
+
+[dependencies]
+princess-core = { path = "../princess-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
