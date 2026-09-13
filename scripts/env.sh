@@ -53,9 +53,30 @@ export CARGO_HOME="$PRINCESSIDE_TOOLCHAIN/cargo"
 export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-stable}"
 
 # QEMU looks for BIOS / option ROM data files (bios-256k.bin, multiboot.bin,
-# linuxboot_dma.bin, ...) under the configured data dir.  They are extracted
-# under the workspace prefix, so scripts pass "-L $PRINCESSIDE_QEMU_DATA".
+# linuxboot_dma.bin, ...) under the configured data dir, so scripts pass
+# "-L $PRINCESSIDE_QEMU_DATA".
+#
+# Prefer the workspace prefix, but fall back to the host's copy.  The fallback
+# is not a shortcut, it is the correct answer on this kind of host: bootstrap's
+# is_installed() deliberately skips packages the host already provides, and
+# qemu-system-x86 / qemu-system-data are two of them.  So on a machine that has
+# QEMU installed the prefix ends up with *no* qemu binary and *no* qemu data,
+# while the qemu-system-x86_64 that actually runs is the host's /usr/bin one --
+# whose data files live in /usr/share/qemu.  Pointing -L at the absent prefix
+# path made smoke-boot.sh, templates/*/run.sh and the P4 acceptance all fail
+# loudly before QEMU ever started (takeover-notes.md section 4.1).
+#
+# The variable stays set either way: when neither directory exists the old
+# prefix path is kept, so those scripts still fail with a message that names
+# the path they wanted rather than an empty string.
 PRINCESSIDE_QEMU_DATA="$PRINCESSIDE_PREFIX/usr/share/qemu"
+for _princesside_qdir in "$PRINCESSIDE_PREFIX/usr/share/qemu" /usr/share/qemu; do
+    if [ -d "$_princesside_qdir" ]; then
+        PRINCESSIDE_QEMU_DATA="$_princesside_qdir"
+        break
+    fi
+done
+unset _princesside_qdir
 export PRINCESSIDE_QEMU_DATA
 
 # ---------------------------------------------------------------------- PATH
