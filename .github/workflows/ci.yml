@@ -2,9 +2,9 @@ name: CI Gate
 
 on:
   push:
-    branches: [main]
+    branches: [PrincessIDE]
   pull_request:
-    branches: [main]
+    branches: [PrincessIDE]
 
 jobs:
   ci-gate:
