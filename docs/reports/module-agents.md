@@ -8,12 +8,12 @@
 
 | 模块 | 负责 Agent（`description`） | 任务书 | 波次 | 状态 | 门（命令 → 结果） |
 |---|---|---|---|---|---|
-| **M1 工具链/环境** | `[M1·Toolchain]` | `.scratch/main/mimo-m1-task.md` | **W1** | ⏳ 待派 | `bash scripts/doctor.sh` → 待跑 |
-| **M12 第二前端** | `[M12·NativeUI]` | `.scratch/main/mimo-m12-task.md` | **W1** | ⏳ 待派（底层 wgpu/ash 未定） | 视图模型同构 + 离屏哈希 → 待跑 |
-| **M10 编排器** | `[M10·Bisect]` | `.scratch/main/mimo-m10-task.md` | **W2** | ⏳ 待派（骨架已由主 Agent 建好） | bisect 端到端 → 待跑 |
-| **M11 插件管理** | `[M11·Plugins]` | `.scratch/main/mimo-m11-task.md` | **W2** | ⏳ 待派（骨架已建；本轮只做引擎侧，不加 IPC） | manifest 校验 + 越权负样本 → 待跑 |
-| **M5+M6 契约面/前端** | `[M5M6·Contracts]` | `.scratch/main/mimo-m5m6-task.md` | **W3（串行首棒）** | ⏳ 待派 | `check-contract.mjs` ALIGNED + 前端 vitest → 待跑 |
-| **M13·JDWP** | `[M13·JDWP]` | `.scratch/main/mimo-m13-task.md` | **W3（串行次棒）** | ⏳ 待派（需 `DebugBackendKind::Jdwp`，动 M0） | `cargo test -p princess-debug` + JDWP 真会话 → 待跑 |
+| **M1 工具链/环境** | `[M1·Toolchain]` | `docs/dispatch/mimo-m1-task.md` | **W1** | ⏳ 待派 | `bash scripts/doctor.sh` → 待跑 |
+| **M12 第二前端** | `[M12·NativeUI]` | `docs/dispatch/mimo-m12-task.md` | **W1** | ⏳ 待派（底层 wgpu/ash 未定） | 视图模型同构 + 离屏哈希 → 待跑 |
+| **M10 编排器** | `[M10·Bisect]` | `docs/dispatch/mimo-m10-task.md` | **W2** | ⏳ 待派（骨架已由主 Agent 建好） | bisect 端到端 → 待跑 |
+| **M11 插件管理** | `[M11·Plugins]` | `docs/dispatch/mimo-m11-task.md` | **W2** | ⏳ 待派（骨架已建；本轮只做引擎侧，不加 IPC） | manifest 校验 + 越权负样本 → 待跑 |
+| **M5+M6 契约面/前端** | `[M5M6·Contracts]` | `docs/dispatch/mimo-m5m6-task.md` | **W3（串行首棒）** | ⏳ 待派 | `check-contract.mjs` ALIGNED + 前端 vitest → 待跑 |
+| **M13·JDWP** | `[M13·JDWP]` | `docs/dispatch/mimo-m13-task.md` | **W3（串行次棒）** | ⏳ 待派（需 `DebugBackendKind::Jdwp`，动 M0） | `cargo test -p princess-debug` + JDWP 真会话 → 待跑 |
 
 > **W3 是串行队列**：M5M6 → M13 → M10 契约接线，**每一棒必须等前一棒提交后再发**，因为三者都改 M0 契约三处镜像。
 
