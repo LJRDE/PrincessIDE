@@ -119,7 +119,7 @@ Version: $PKG_VERSION
 Section: devel
 Priority: optional
 Architecture: amd64
-Depends: libgtk-3-0, libwebkit2gtk-4.1-0, libjavascriptcoregtk-4.1-0, libsoup-3.0-0
+Depends: libgtk-3-0t64 | libgtk-3-0, libwebkit2gtk-4.1-0, libjavascriptcoregtk-4.1-0, libsoup-3.0-0
 Maintainer: PrincessIDE Team
 Description: PrincessIDE - IDE for x86_64 kernel development
  PrincessIDE is a desktop IDE designed for x86_64 kernel developers.
@@ -156,6 +156,45 @@ EOF
     log "deb package created: $DEB_OUT"
     log "package info:"
     dpkg-deb --info "$DEB_OUT" 2>/dev/null | head -20 || true
+
+    # Verify every Depends group resolves on this host.
+    #
+    # Not ceremony.  This list was hardcoded as `libgtk-3-0`, which was right on
+    # bookworm, but Debian's 64-bit time_t transition renamed that package to
+    # `libgtk-3-0t64`.  On trixie the .deb therefore declared a dependency that
+    # no longer exists — and nothing noticed, because `dpkg-deb --build` never
+    # resolves names.  The check below turns that into a failure naming the group.
+    #
+    # Two traps this code exists to avoid, both hit while writing it:
+    #   * `apt-cache show <name>` exits 100 for an unknown name but exits 0 with
+    #     *empty output* for a name apt knows of without holding a record for
+    #     (libgtk-3-0 is exactly that on trixie).  Testing the exit code passes
+    #     the broken list; only a `Package:` stanza proves a real package.
+    #   * iterating `for x in $(...)` splits `a | b` on the spaces around the
+    #     pipe, so each half is judged alone and the alternative is lost.  Hence
+    #     the explicit line-by-line reads below.
+    #
+    # A group `a | b` is satisfied when *any* member resolves — that is the whole
+    # point of writing the alternative form.
+    DEPENDS_LINE="$(dpkg-deb -f "$DEB_OUT" Depends)"
+    BROKEN=""
+    while IFS= read -r group; do
+        group="$(printf '%s' "$group" | tr -d ' ')"
+        [ -n "$group" ] || continue
+        group_ok=0
+        while IFS= read -r name; do
+            [ -n "$name" ] || continue
+            if apt-cache show "$name" 2>/dev/null | grep -q '^Package:'; then
+                group_ok=1
+            fi
+        done < <(printf '%s\n' "$group" | tr '|' '\n')
+        [ "$group_ok" -eq 1 ] || BROKEN="$BROKEN $group"
+    done < <(printf '%s\n' "$DEPENDS_LINE" | tr ',' '\n')
+
+    if [ -n "$BROKEN" ]; then
+        die "unresolvable Depends group(s):$BROKEN — this .deb would not install here"
+    fi
+    log "dependency check: every Depends group resolves on this host"
 fi
 
 log "done"
