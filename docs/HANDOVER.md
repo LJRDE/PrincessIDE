@@ -3,7 +3,7 @@
 > **项目**：面向 x86_64 操作系统内核开发的 Linux 桌面 IDE
 > **状态**：实现骨架完整、两道门（`ci-gate` + 边界门）已落地；**界面从未在真机启动过**
 > **日期**：2026-09-13（本文档随 `f8bb6d4` 之后重写）
-> **基线**：本地分支 **`PrincessIDE`**（`origin/master` 也是同一提交 `f8bb6d4`）@ **76 个提交**
+> **基线**：分支 **`PrincessIDE`** @ **`be44149`**（远端 `origin` = `https://github.com/LJRDE/PrincessIDE`，默认分支已切到 `PrincessIDE`）
 > **维护者**：项目所有者（ljr）单人维护
 > **上一版**：本文件曾被写成"8 crate / 516 测试 / D1–D26"，已过时（缺少 M10–M13 与 D27–D33）。**当前权威状态入口是 `docs/reports/takeover-notes.md`**，本文是它的结构化展开。
 
@@ -324,10 +324,18 @@ pnpm -C apps/desktop tauri dev
 2. **`apps/native` 未接入 `ci-gate`**：登记在 `ownership.toml` 的 `independent_workspaces.coverage`
 3. **`princess-cli` 的部分模块**（`serial.rs`/`diagnostics.rs`/`symbolize.rs`）是夹具相关解析的临时归属，长期应迁到对应 crate
 4. **`princess-bisect` / `princess-plugins` 已在根 workspace 成员里但没有测试**——门会跑过它们，但等于空转
-5. **⚠️ CI 永远不会触发**：`.github/workflows/ci.yml` 的 `on.push/pull_request` 只写 `branches: [main]`，
-   而本地分支是 **`PrincessIDE`**、远端跟踪是 **`origin/master`** —— 三者不一致。
-   且 `origin` 目前指向本地 `.git`（无真实远端）。修法：改 `ci.yml` 的分支名，或统一分支命名。
-6. **`docs/reports/fixlist.json` 的 10 项**：**9 项 `fixed` + 1 项 `not-a-bug`**（不是"全部 fixed"）
+5. ~~**CI 永远不会触发**~~ **已修**（`be44149`）：`ci.yml` 原本只监听 `branches: [main]`，而工作分支是
+   `PrincessIDE`、旧远端跟踪还是 `master`，三者不一致导致门从不触发。现已改为 `PrincessIDE`，
+   并在 `LJRDE/PrincessIDE` 上实测触发成功。**注意**：`ci-gate.sh` 第 5/6 步依赖 `.toolchain/`，
+   而 workflow 里没有 `bootstrap-toolchain.sh` 那一步——runner 上靠系统自带 rustup 兜底，CI 能否全绿需看实际运行。
+6. **`/etc/hosts` 劫持了 `api.github.com`**（本机环境坑）：该文件把 `api.github.com` 与 `github.com`
+   指向同一个 IP `20.205.243.166`，而 API 的真实地址是 `20.205.243.168`。后果是**所有 GitHub API 调用
+   落到网页服务上**，返回 301/406：`gh auth login` 直接报 `error validating token: HTTP 406`，
+   `gh api` 全部失效（`git` 本身不受影响，因为它走 `github.com`）。
+   `/etc/hosts` 是 `root:root 0644`，本项目在容器内无可用 root（`sudo` 需密码 + `no-new-privileges`），
+   所以 `.toolchain/bin/gh` 启动器用**私有挂载命名空间**（`unshare --mount --map-root-user` + bind mount）
+   喂给 gh 一份修正的 hosts；一旦你在宿主侧修好 `/etc/hosts`，启动器会走快速路径自动停用绕行。
+7. **`docs/reports/fixlist.json` 的 10 项**：**9 项 `fixed` + 1 项 `not-a-bug`**（不是"全部 fixed"）
 
 ---
 
@@ -420,11 +428,12 @@ clangd 报错？  → 检查 .clangd 是否用了 -nostdlibinc（不是 -nostdin
 - [x] README + INSTALL + 打包脚本 + 冒烟 CI 脚本
 - [x] **删除误建的 `newrepo/`**（空 git 仓库，无 commit/ref/object）
 - [x] **本机亲跑两道无需工具链的门**：契约门 `ALIGNED`、边界门 exit 0（§5.2）
-- [ ] **本机未装工具链**：`.toolchain/` / `target/` / `node_modules/` 均不存在 → 先跑 §4 第 1 步
+- [x] **GitHub 远端接好**：`origin` 原指向本地 `.git`（坏），已改为 `LJRDE/PrincessIDE` 并推送
+- [x] **CI 分支名已修**：`ci.yml` 由 `main` 改为 `PrincessIDE`，实测触发成功
+- [ ] **本机未装工具链**：`.toolchain/` 里目前只有手工装的 gh；`target/` / `node_modules/` 不存在 → 先跑 §4 第 1 步
 - [ ] **`ci-gate` 的 1–6 步本机未跑**：§5.3 全是静态计数，§5.1 是上一台机器的历史结论
-- [ ] **界面待首次真机启动**：`pnpm -C apps/desktop tauri dev`
 - [ ] **待修 bug 清单**：`docs/reports/fixlist.json` 里 10 项已处理（9 fixed + 1 not-a-bug），新清单需你提供
-- [ ] **CI 分支名不匹配**（见 §7 技术债 5）：`ci.yml` 写 `main`，实际分支 `PrincessIDE`
+- [ ] **`Cargo.toml` 与 LICENSE 不一致**：声明 `MIT OR Apache-2.0`，但 `LICENSE` 只授予 MIT
 
 ---
 
