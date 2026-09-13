@@ -53,8 +53,12 @@
 ## 五、波次计划（见 `docs/reports/module-agents.md` 的实时状态）
 
 - **W1（并行 2 路）**：`[M12·NativeUI]`（最重、独立 workspace）+ `[M1·Toolchain]`（最轻、独占 scripts）——两者零交叉。
-- **W2（并行 2 路）**：`[M10·Bisect]` + `[M11·Plugins]`——**前提是不加 IPC 命令**（只做引擎侧 + 独立验收），
-  且两个新 crate 骨架由主 Agent 预先提交，两路各自只写自己的目录。
+- **W2（并行 2 路）**：`[M10·Bisect]` + `[M11·Plugins]`——**四个前提缺一不可**：
+  ① 不加 IPC 命令（只做引擎侧 + 独立验收）；② 只写自己的 crate 目录（骨架由主 Agent 预先提交）；
+  ③ 不改 `princess-core` 枚举；④ **不新增依赖**（新增依赖要改根 `Cargo.toml` 的 `[workspace.dependencies]`，
+  那正是两路唯一还会争的文件；测试请照仓库既有约定用 std 自写 `temp_dir(tag)` helper，**不要**引入 `tempfile`）。
+  未被消除的共享点：`Cargo.lock`（守住④即不会变）、`target/`（cargo 会排队等锁，属正常）、
+  **D22 上限**（两路重型构建正好占满 2 路，期间不得再加第三路）。
 - **W3（串行队列）**：`[M5+M6·契约面]` → `[M13·JDWP]` → `[M10·bisect 契约接线]`，逐个落地（每个都必须等到前一个**提交**后再发）。
 
 ## 六、每路的"门"必须是模块表里的那条（示例）
