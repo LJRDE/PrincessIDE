@@ -26,31 +26,181 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* The shell scrolls internally; the page itself must never scroll, or the
+     rail and dock would slide away with the content. */
+  overflow: hidden;
 }
+
+/* ---------------------------------------------------------------------------
+   Shell: [ activity rail | editor | dock ]
+   The editor is the main column and never yields width unless the user asks
+   for a panel.  Everything else is chrome and is kept small on purpose.
+   --------------------------------------------------------------------------- */
 
 .topbar {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  padding: 8px 12px;
+  padding: 4px 10px;
+  min-height: 30px;
+  flex: 0 0 auto;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
-  padding: 10px;
-  overflow: auto;
-  flex: 1;
+.brand {
+  font-size: 12px;
+  letter-spacing: 0.02em;
 }
 
-.col {
+.shell {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.rail {
+  flex: 0 0 auto;
+  width: 68px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
+  padding: 6px 4px;
+  border-right: 1px solid var(--line);
+  background: #191c22;
+  overflow-y: auto;
+}
+
+.rail-btn {
+  appearance: none;
+  width: 100%;
+  padding: 7px 2px;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.rail-btn:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.rail-btn.active {
+  color: var(--fg);
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+.main {
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  overflow: hidden;
+}
+
+/* The editor panel drops its chrome: no title bar, no border, full height. */
+.main .panel-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.main .panel-editor > h1 {
+  display: none;
+}
+
+.main .panel-editor > div {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.main .editor-host,
+.main .cm-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.dock {
+  flex: 0 0 auto;
+  width: 380px;
+  max-width: 45vw;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.dock[hidden] {
+  display: none;
+}
+
+.dock-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 6px 3px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.dock-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+/* Panels inside the dock drop their own title/border: the dock header names
+   them, so repeating it would just cost vertical space. */
+.dock-body .panel {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.dock-body .panel > h1 {
+  display: none;
+}
+
+.btn-sm {
+  appearance: none;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-sm:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .panel {

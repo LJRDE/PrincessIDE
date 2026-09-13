@@ -48,7 +48,17 @@ export interface AppHandles {
   destroy(): void;
 }
 
-function section(root: HTMLElement, title: string, testid: string): HTMLElement {
+/**
+ * Build one panel: a titled `<section>` that carries the testid (so hiding the
+ * section hides the whole panel) wrapping the `<div>` the view mounts into.
+ * Both halves are returned because the shell needs to hide the former while
+ * handing the latter to the view.
+ */
+function section(
+  root: HTMLElement,
+  title: string,
+  testid: string,
+): { section: HTMLElement; body: HTMLElement } {
   const sec = document.createElement('section');
   sec.className = 'panel';
   const h = document.createElement('h1');
@@ -58,7 +68,16 @@ function section(root: HTMLElement, title: string, testid: string): HTMLElement 
   const body = document.createElement('div');
   sec.appendChild(body);
   root.appendChild(sec);
-  return body;
+  return { section: sec, body };
+}
+
+/**
+ * Short rail label for a panel id: `toolchain-panel` -> `TOOLCHAIN`.  The rail
+ * is narrow on purpose; rendering full titles would force it wide enough to eat
+ * into the editor, which is exactly what this layout exists to stop.
+ */
+function railLabel(id: string): string {
+  return id.replace(/-panel$/, '').toUpperCase();
 }
 
 export interface MountAppOptions {
@@ -81,30 +100,61 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
   root.className = 'app';
 
   // --- Top bar (not a registry view — it's the app shell itself) -----------
+  // Deliberately one thin strip.  Everything that is a *panel* lives behind the
+  // activity rail instead of up here, so the chrome stays out of the way of the
+  // thing the window is for.
   const header = document.createElement('header');
   header.className = 'topbar';
   const brand = document.createElement('strong');
+  brand.className = 'brand';
   brand.textContent = 'PrincessIDE';
   const envChip = document.createElement('span');
   envChip.className = 'chip';
   envChip.dataset['testid'] = 'env';
   envChip.textContent = isTauri() ? 'tauri shell' : 'browser preview (no engine IPC)';
   const refresh = document.createElement('button');
+  refresh.type = 'button';
+  refresh.className = 'btn-sm';
   refresh.dataset['testid'] = 'refresh-tools';
   refresh.textContent = 'detect toolchain';
   header.append(brand, envChip, refresh);
   root.appendChild(header);
 
-  // --- Grid layout (left / right columns) ---------------------------------
-  const grid = document.createElement('div');
-  grid.className = 'grid';
-  root.appendChild(grid);
+  // --- Shell: activity rail | editor | dock --------------------------------
+  const shell = document.createElement('div');
+  shell.className = 'shell';
+  root.appendChild(shell);
 
-  const left = document.createElement('div');
-  left.className = 'col';
-  const right = document.createElement('div');
-  right.className = 'col';
-  grid.append(left, right);
+  const rail = document.createElement('nav');
+  rail.className = 'rail';
+  rail.dataset['testid'] = 'activity-rail';
+
+  const main = document.createElement('main');
+  main.className = 'main';
+
+  const dock = document.createElement('aside');
+  dock.className = 'dock';
+  dock.dataset['testid'] = 'dock';
+  dock.hidden = true;
+
+  const dockHead = document.createElement('div');
+  dockHead.className = 'dock-head';
+  const dockTitle = document.createElement('span');
+  dockTitle.className = 'dock-title';
+  dockTitle.dataset['testid'] = 'dock-title';
+  const dockClose = document.createElement('button');
+  dockClose.type = 'button';
+  dockClose.className = 'btn-sm';
+  dockClose.dataset['testid'] = 'dock-close';
+  dockClose.textContent = '✕';
+  dockClose.title = 'Close panel (or click the rail item again)';
+  dockHead.append(dockTitle, dockClose);
+
+  const dockBody = document.createElement('div');
+  dockBody.className = 'dock-body';
+
+  dock.append(dockHead, dockBody);
+  shell.append(rail, main, dock);
 
   // --- Error display (IPC failures, contract §0.4) -------------------------
   const errorHost = document.createElement('div');
@@ -112,20 +162,73 @@ export function mountApp(root: HTMLElement, options: MountAppOptions = {}): AppH
   errorHost.dataset['testid'] = 'ipc-errors';
   root.appendChild(errorHost);
 
-  // --- Mount all registered views ------------------------------------------
+  // --- Mount views: the editor is the main area, everything else is a panel --
   const views = listViews();
   const mounted: { view: typeof views[number]; result: ViewMountResult & Record<string, unknown> }[] = [];
 
-  // Column assignment: first 3 views go left, rest go right.
-  const columnMap = [left, left, left, right, right];
+  const editorView = views.find((v) => v.id === 'editor-panel');
+  const panelViews = views.filter((v) => v !== editorView);
 
-  for (let i = 0; i < views.length; i++) {
-    const view = views[i];
-    const col = columnMap[i] ?? right;
-    const host = section(col, view.title, view.testid);
-    const result = view.mount(host) as ViewMountResult & Record<string, unknown>;
-    mounted.push({ view, result });
+  // The editor is not a dock panel.  It stays mounted and fills the main column
+  // for the whole session, so switching panels never tears CodeMirror down —
+  // which would throw away undo history, cursor position and scroll offset.
+  if (editorView) {
+    const { section: sec, body } = section(main, editorView.title, editorView.testid);
+    sec.classList.add('panel-editor');
+    sec.dataset['panelId'] = editorView.id;
+    const result = editorView.mount(body) as ViewMountResult & Record<string, unknown>;
+    mounted.push({ view: editorView, result });
   }
+
+  // Panels mount once, up front; only their `hidden` flag changes.  Keeping
+  // them all in the DOM is deliberate — the registry and DOM tests assert every
+  // testid is present, and that check is what catches a view that is registered
+  // but never mounted.
+  const panelHosts = new Map<string, { section: HTMLElement; btn: HTMLButtonElement }>();
+
+  let activePanel: string | null = null;
+
+  const showPanel = (id: string | null): void => {
+    activePanel = id;
+    for (const [panelId, entry] of panelHosts) entry.section.hidden = panelId !== id;
+    dock.hidden = id === null;
+    for (const [panelId, entry] of panelHosts) {
+      entry.btn.classList.toggle('active', panelId === id);
+      entry.btn.setAttribute('aria-pressed', panelId === id ? 'true' : 'false');
+    }
+    dockTitle.textContent = panelViews.find((v) => v.id === id)?.title ?? '';
+  };
+
+  for (const view of panelViews) {
+    const { section: sec, body } = section(dockBody, view.title, view.testid);
+    sec.hidden = true;
+    // A stable handle for the shell's own show/hide logic.  Panels name their
+    // sections inconsistently (`toolchain-panel` but `action-panel-section`) and
+    // some reuse their id for an element *inside* the section, so matching on
+    // testids here would be a standing source of confusion.
+    sec.dataset['panelId'] = view.id;
+    const result = view.mount(body) as ViewMountResult & Record<string, unknown>;
+    mounted.push({ view, result });
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'rail-btn';
+    btn.dataset['panel'] = view.id;
+    btn.dataset['testid'] = `rail-${view.id}`;
+    btn.title = view.title;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.textContent = railLabel(view.id);
+    btn.addEventListener('click', () => {
+      // Clicking the active item collapses the dock, so the editor can always
+      // get its full width back without hunting for the close button.
+      showPanel(activePanel === view.id ? null : view.id);
+    });
+    rail.appendChild(btn);
+
+    panelHosts.set(view.id, { section: sec, btn });
+  }
+
+  dockClose.addEventListener('click', () => showPanel(null));
 
   // --- Wire up action panel callbacks --------------------------------------
   const actionMount = mounted.find((m) => m.view.id === 'action-panel');
