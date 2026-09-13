@@ -83,6 +83,7 @@ pub fn plan_build(project: &Project, targets: Option<&[String]>) -> Result<Build
             ],
             BuildBackendKind::Cargo => vec!["cargo".to_string(), "build".to_string()],
             BuildBackendKind::Zig => vec!["zig".to_string(), "build".to_string()],
+            BuildBackendKind::Javac => vec!["javac".to_string()],
             BuildBackendKind::Custom => {
                 return Err(PrincessError::invalid_config(
                     "[build] backend = \"custom\" requires an explicit [build] command",
