@@ -64,3 +64,4 @@ a.out
 
 # 便携包产物（scripts/package-portable.sh 的输出目录）
 dist-packages/
+.cargo/.global-cache
