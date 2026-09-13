@@ -10,9 +10,9 @@
 
 - **Agent 名（`subagent` 的 `description`）= 模块 id + 切片名**，例如 `[M12·NativeUI] 原生骨架`。
 - **任务书首行同样带 `[Mxx·Name]`**：GUI 里每行显示的是**会话标题**（由首条 prompt 自动生成），带前缀你就能对上模块。
-- **派发位置**：**用户的新会话**用 `subagent(provider="xiaomi-token-plan-cn", model="mimo-v2.5-pro", run_in_background=true)`
-  —— 这是唯一"**可见 + 不阻塞主 Agent + 可直选 Mimo**"的组合（D27.2：模型选择只对新会话生效；D28.1：headless 不可见）。
-  回退顺序：`workflow`（可见但前台阻塞）→ headless（不可见）。
+- **派发由用户执行**（D32）：**主 Agent 不再自行派发子 Agent**。用户在**新会话**里派，模型选 `mimo-v2.5-pro`、后台运行——
+  这是唯一"**可见 + 不阻塞主 Agent + 可直选 Mimo**"的组合（D27.2：模型选择只对新会话生效；D28.1：headless 不可见）。
+- **主 Agent 的职责**：写/维护任务书 → 子 Agent 落地后**亲跑门复核**（D14）→ 选择性提交 → 更新台账 `docs/reports/module-agents.md`。
 
 ## 二、任务书固定六段（缺一段即返工）
 
