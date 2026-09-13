@@ -139,6 +139,7 @@ PrincessIDE/
 ├── templates/x86_64-multiboot2/  内核工程模板 + verify-template.sh（38 契约字段自检）
 ├── scripts/                      ★ 15 个脚本（3,240 行）
 │   ├── ci-gate.sh                ★ 主门（7 步，D29.4）
+│   ├── run-ide.sh                ★ 启动桌面 shell（自带预检；--browser / --check）
 │   ├── check-boundaries.py       ★ 边界门（D33）
 │   ├── bootstrap-toolchain.sh / env.sh / doctor.sh
 │   ├── smoke-boot.sh / smoke-ci.sh / symbolicate.sh
@@ -163,38 +164,45 @@ PrincessIDE/
 
 ## 4. 快速开始
 
-> **本机现状**：这是一次全新克隆——`.toolchain/`、`target/`、`node_modules/` **都不存在**。先跑第 1 步。
+> **本机现状**（2026-09-13）：`.toolchain/` 已 bootstrap（仅缺 `clangd-16`，见 §7）、`node_modules/` 已装、
+> 夹具已构建、引擎与前端测试都已跑过。**直接跳到第 6 步就能启动。**
 
 ```bash
-# 0) 系统依赖（GUI 需要；详见 INSTALL.md）
+# 0) 系统依赖（GUI 需要；详见 INSTALL.md）—— 本机已齐全
 sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
   libjavascriptcoregtk-4.1-dev libsoup-3.0-dev librsvg2-dev \
   pkg-config build-essential file wget curl
 
-# 1) 工具链（幂等，装进 .toolchain/，耗时较久）
+# 1) 工具链（幂等；本机已装）
 bash scripts/bootstrap-toolchain.sh
 
-# 2) 激活环境（每个新 shell 都要 source）
+# 2) 激活环境（每个新 shell 都要 source；第 6 步的脚本会自己 source）
 source scripts/env.sh
-bash scripts/doctor.sh                    # 期望 exit 0
 
 # 3) 前端依赖 + 快速门
-pnpm install
-bash scripts/ci-gate.sh --fast            # 期望 pass=4 fail=0（+ 边界门）
+pnpm -C apps/desktop install               # 镜像不通时加 --registry=https://registry.npmmirror.com
+bash scripts/ci-gate.sh --fast             # 期望 pass=4 fail=0
 
 # 4) 跑测试
-cargo test --workspace                    # 引擎 12 crate
-(cd apps/desktop/src-tauri && cargo test) # 外壳（独立 workspace）
+cargo test --workspace --no-fail-fast      # 引擎 12 crate（先 make 夹具，见 §5.2）
+(cd apps/desktop/src-tauri && cargo test --lib)   # 外壳单元测试
 
 # 5) 全链冒烟（需 QEMU）
-bash scripts/smoke-ci.sh
+bash scripts/smoke-boot.sh
 
-# 6) 启动 IDE（首次真机运行，重点观察）
-pnpm -C apps/desktop tauri dev
+# 6) 启动 IDE —— 推荐用脚本，它自己 source env.sh 并做预检
+bash scripts/run-ide.sh
+#   等价于： source scripts/env.sh && pnpm -C apps/desktop tauri dev
+#   无显示器： bash scripts/run-ide.sh --browser   （只有界面，没有引擎）
+#   只预检：   bash scripts/run-ide.sh --check
 ```
 
-**IDE 使用流程**：`Open Project` → 选含 `princess.toml` 的工程（如 `templates/x86_64-multiboot2/`）
-→ `🔨 Build` → 事件流出现 `build.started → build.finished` → `▶ Run` → 串口区出现内核输出。
+**两条使用流程：**
+
+- **当文本编辑器用**（不需要 `princess.toml`）：编辑器面板 → `Open File…` → 编辑 → **`Ctrl+S`** 保存。
+  读写边界自动取该文件所在目录；若先 `Open Project`，边界则变成工程根。
+- **当内核 IDE 用**：`Open Project` → 选含 `princess.toml` 的工程（如 `templates/x86_64-multiboot2/`）
+  → `🔨 Build` → 事件流出现 `build.started → build.finished` → `▶ Run` → 串口区出现内核输出。
 
 ---
 
@@ -445,6 +453,7 @@ clangd 报错？  → 检查 .clangd 是否用了 -nostdlibinc（不是 -nostdin
 | **双前端轨道** | `docs/spec/30-modules.md` §五 + `docs/spec/31-native-frontend.md` |
 | **各阶段交付情况** | `docs/reports/STATUS.md` + 22 份其他报告（含 `takeover-notes.md` / `fixlist.json`） |
 | **怎么跑全链验证** | `scripts/smoke-ci.sh` / `scripts/ci-gate.sh` |
+| **怎么启动界面** | `bash scripts/run-ide.sh`（`--check` 只预检，`--browser` 无显示器时用） |
 | **要派 Agent 时** | `docs/dispatch/`（7 份任务书 + 派发口径） |
 | **领域调研结论** | `docs/research/`（clangd / QEMU / 调试协议 / 二进制工具） |
 

@@ -81,9 +81,21 @@ cargo test --workspace
 ### 8. 启动桌面应用（需要显示器环境）
 
 ```bash
-cd apps/desktop/src-tauri
-cargo run
+bash scripts/run-ide.sh
 ```
+
+脚本会自己 `source scripts/env.sh` 并做预检（依赖、Rust、GUI 库、显示器、1420 端口），
+任一不满足都直接告诉你修复命令，而不是让 Tauri 在更深处报一个看不懂的错。
+
+| 想要 | 命令 |
+|---|---|
+| 正常启动（Tauri 窗口 + 引擎） | `bash scripts/run-ide.sh` |
+| 只预检、不启动 | `bash scripts/run-ide.sh --check` |
+| 无显示器时的界面预览（只有界面，没有引擎） | `bash scripts/run-ide.sh --browser` |
+
+等价的手工命令是 `source scripts/env.sh && pnpm -C apps/desktop tauri dev`。
+注意**不要**用 `cd apps/desktop/src-tauri && cargo run` —— 那样不会起 vite 开发服务器，
+前端加载的是 `dist/` 里的旧构建产物，也没有热更新。
 
 ---
 
