@@ -433,7 +433,8 @@ clangd 报错？  → 检查 .clangd 是否用了 -nostdlibinc（不是 -nostdin
 - [ ] **本机未装工具链**：`.toolchain/` 里目前只有手工装的 gh；`target/` / `node_modules/` 不存在 → 先跑 §4 第 1 步
 - [ ] **`ci-gate` 的 1–6 步本机未跑**：§5.3 全是静态计数，§5.1 是上一台机器的历史结论
 - [ ] **待修 bug 清单**：`docs/reports/fixlist.json` 里 10 项已处理（9 fixed + 1 not-a-bug），新清单需你提供
-- [ ] **`Cargo.toml` 与 LICENSE 不一致**：声明 `MIT OR Apache-2.0`，但 `LICENSE` 只授予 MIT
+- [x] **许可证与声明对齐**：`LICENSE`（MIT）+ 新增 `LICENSE-APACHE`，与 `Cargo.toml` 的 `MIT OR Apache-2.0` 一致
+- [ ] **界面待首次真机启动**：`pnpm -C apps/desktop tauri dev`
 
 ---
 
