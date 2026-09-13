@@ -23,7 +23,7 @@
 | TypeScript（前端测试） | 2,397 行 |
 | C + 汇编 + Java（夹具/模板） | 2,705 行 |
 | Bash + Python（脚本） | 3,240 行 / 15 文件 |
-| **单元测试（静态计数）** | **引擎 614** ｜ 前端 124 ｜ 外壳 30 ｜ 合计 **768** |
+| **单元测试（静态计数）** | **引擎 614** ｜ 前端 130 ｜ 外壳 39 ｜ 合计 **768** |
 | **git 提交** | 76 |
 | **git 跟踪文件** | 305 |
 | **交付报告** | 23 份（`docs/reports/`） |
@@ -59,12 +59,12 @@ Tauri 外壳       3,072 行  ███████                IPC 命令 + 
 ┌─────────────────────────────────────────────────────────────────┐
 │              Web 前端 (Vite + TypeScript)  ← 默认 / 参考实现       │
 │  CodeMirror 6 │ 视图注册表 │ 事件日志 │ 工具链表 │ 调试面板 │ LSP   │
-│              契约类型 (24 命令 / 10 错误码)                        │
+│              契约类型 (26 命令 / 10 错误码)                        │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ IPC (Tauri invoke) + 事件流 (emit)
 ┌──────────────────────────┴──────────────────────────────────────┐
 │              Tauri 外壳 (apps/desktop/src-tauri)  [独立 workspace]│
-│  commands.rs (24 命令路由) │ events.rs (EventBus) │ ops.rs (取消)  │
+│  commands.rs (26 命令路由) │ events.rs (EventBus) │ ops.rs (取消)  │
 │  build/run/debug/lsp/project handler │ TauriEventSink │ doctor.rs │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ path 依赖
@@ -113,13 +113,13 @@ PrincessIDE/
 │
 ├── apps/desktop/                 ★ Tauri 桌面应用（唯一前端）
 │   ├── src/                      前端（3,647 行）
-│   │   ├── contract/             ipc.ts（24 命令 + 10 错误码）/ events.ts / parse.ts
+│   │   ├── contract/             ipc.ts（26 命令 + 10 错误码）/ events.ts / parse.ts
 │   │   ├── state/                eventStore / fixtureLoader / liveStream（isTauri 才订阅）
 │   │   ├── components/           actionPanel / debugPanel / editor / eventLog / toolTable
 │   │   ├── views/registry.ts     ★ 视图注册表（新面板自注册即被挂载）
 │   │   └── ipc/client.ts, lsp/client.ts
 │   ├── src-tauri/                Rust 外壳（3,072 行，独立 workspace）
-│   ├── tests/                    vitest（124 测试，含 DOM 挂载断言）
+│   ├── tests/                    vitest（130 测试，含 DOM 挂载断言）
 │   └── scripts/check-contract.mjs 契约三方一致性检查
 │
 ├── apps/native/                  ❌ 不存在（M12 第二前端，尚未开工；已在 ownership.toml 登记为已知缺口）
@@ -209,7 +209,7 @@ pnpm -C apps/desktop tauri dev
 | 引擎工作区 | `cargo test --workspace` | **454+ passed, 0 failed, 2 ignored** |
 | 外壳 | `cd apps/desktop/src-tauri && cargo test` | 34 passed（含 4 个 e2e，其一真跑 `doctor.sh`） |
 | 契约对齐 | `node apps/desktop/scripts/check-contract.mjs` | **`result: ALIGNED`** |
-| 前端 | `pnpm -C apps/desktop test` | **124 passed** |
+| 前端 | `pnpm -C apps/desktop test` | **130 passed** |
 | 门（全量） | `bash scripts/ci-gate.sh` | **`pass=7 fail=0`** |
 | 门（快速） | `bash scripts/ci-gate.sh --fast` | **`pass=4 fail=0`** |
 | 边界门 | `python3 scripts/check-boundaries.py` | exit 0 |
@@ -223,11 +223,13 @@ pnpm -C apps/desktop tauri dev
 
 | 检查项 | 命令 | 结果 |
 |---|---|---|
-| **快速门（4 步）** | `bash scripts/ci-gate.sh --fast` | **`pass=4 fail=0`** — tsc / vitest 124 / 契约 / vite build / 边界门 |
-| **契约三方一致** | `node apps/desktop/scripts/check-contract.mjs` | **`result: ALIGNED`** — spec/TS/Rust 各 24 命令逐字一致、10 错误码三方一致 |
+| **快速门（4 步）** | `bash scripts/ci-gate.sh --fast` | **`pass=4 fail=0`** — tsc / vitest 130 / 契约 / vite build / 边界门 |
+| **契约三方一致** | `node apps/desktop/scripts/check-contract.mjs` | **`result: ALIGNED`** — spec/TS/Rust 各 26 命令逐字一致、10 错误码三方一致 |
 | **边界门** | `python3 scripts/check-boundaries.py` | **exit 0** |
-| **前端测试** | `pnpm -C apps/desktop exec vitest run` | **124 passed / 11 files**（Node 24.21.0） |
+| **前端测试** | `pnpm -C apps/desktop exec vitest run` | **130 passed / 12 files**（Node 24.21.0） |
 | **引擎测试** | `cargo test --workspace --no-fail-fast` | **615 passed / 5 failed / 2 ignored**（见 §5.3） |
+| **外壳单元测试** | `cd apps/desktop/src-tauri && cargo test --lib` | **39 passed / 0 failed**（含 `fs_handler` 的 9 个） |
+| **桌面应用编译** | `cd apps/desktop/src-tauri && cargo build` | **exit 0** |
 | **符号化验收** | `cargo run -p princess-symbol --example symbolicate fixtures/refkernel/build/refkernel.elf 0x100b3d` | **`refkernel_fault_probe` → `kernel.c:100`** ✅，与系统 `addr2line` 一致 |
 
 > **跑引擎测试前必须先构建夹具**：`make -C fixtures/refkernel && make -C fixtures/paging-kernel`。
@@ -254,9 +256,9 @@ pnpm -C apps/desktop tauri dev
 | 项 | 静态值 |
 |---|---|
 | 引擎测试函数 | 614（`princess-bin` 109 / `princess-debug` 85 / `princess-build` 72 / `princess-run` 66 / `princess-ai` 63 / `princess-symbol` 55 / `princess-core` 47 / `princess-cli` 46 / `princess-view` 45 / `princess-lang` 26） |
-| 前端测试 | 124 |
+| 前端测试 | 130 |
 | 外壳测试 | 30 |
-| IPC 命令 | 24（已由契约门实测确认） |
+| IPC 命令 | 26（已由契约门实测确认） |
 | 错误码 | 10（`E_AI_UNAVAILABLE` `E_BUILD_FAILED` `E_CANCELLED` `E_INTERNAL` `E_INVALID_CONFIG` `E_NOT_FOUND` `E_QEMU_FAILED` `E_SANDBOX_DENIED` `E_TIMEOUT` `E_TOOLCHAIN_MISSING`） |
 
 ### 5.5 ❌ 尚未验证的东西（诚实标注）
@@ -349,7 +351,7 @@ pnpm -C apps/desktop tauri dev
    并在 `LJRDE/PrincessIDE` 上实测触发成功。
 6. **⚠️ 但 CI 修好分支名后会连挂三步**（因为它此前从未跑过，这些缺陷一直没暴露）。实测证据：
    - **第 2 步**：Node 20 上 `jsdom@30` 的 `undici@8` 调用 `webidl.util.markAsUncloneable` 直接抛错
-     → 已修为 `node-version: '24'`（本机 124 测试在此版本全绿），**该提交尚待推送**。
+     → 已修为 `node-version: '24'`（本机前端测试在此版本全绿），**该提交尚待推送**。
    - **第 5 步**：`cargo test --workspace` 需要夹具已构建（`fixtures/*/build/*.elf` 被 gitignore）
      与 `.toolchain/` 就位；workflow 两者都没做 → 必挂（见 §5.3：裸跑 41 个失败）。
    - **第 6 步**：`tools_detect_e2e.rs` 真跑 `scripts/doctor.sh` 并断言 `missing.is_empty()`，
@@ -465,6 +467,8 @@ clangd 报错？  → 检查 .clangd 是否用了 -nostdlibinc（不是 -nostdin
 - [x] **引擎测试本机已亲跑**：`cargo test --workspace --no-fail-fast` → **615 passed / 5 failed / 2 ignored**，
       5 个失败全部定位为环境问题（§5.3）
 - [x] **符号化验收通过**：`refkernel_fault_probe` → `kernel.c:100`，与 `addr2line` 一致（§5.2）
+- [x] **编辑器可当文本编辑器用**（§3 `fs` 域）：Open File… / Save / Ctrl+S，
+      读写路径被限制在工程根内，越界返回 `E_SANDBOX_DENIED`；契约 24 → 26 条命令，三处原子迁移
 - [x] **夹具已构建**：`fixtures/{refkernel,paging-kernel}/build/*.elf`（**被 gitignore，克隆后必须重建**）
 - [ ] **⚠️ 有 2 个提交尚未推送**（网络到 github.com 不稳）：`ci: run on Node 24` + 本文档更新
 - [ ] **CI 第 5、6 步仍会失败**，原因与修法见 §7 技术债 6（需决定：CI 里 bootstrap，或把这两步拆出 CI）
