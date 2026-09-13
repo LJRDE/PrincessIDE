@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 # PrincessIDE P0 — toolchain bootstrap.
 #
+# LC_ALL=C is forced for the whole script, and that is load-bearing rather than
+# cosmetic.  Several checks parse the *human-readable* output of apt, which apt
+# translates: on a zh_CN.UTF-8 host `apt-cache policy gdb` prints "候选: 16.3-1"
+# instead of "Candidate: 16.3-1", so the `sed -n 's/^  Candidate: //p'` in
+# gdb16_index_usable matched nothing, the index was declared unusable, and
+# bootstrap reset the index, failed the check again and exited 1 -- on a machine
+# where the index was perfectly fine and the fetch had just succeeded.
+# Forcing the C locale makes every child command (apt, apt-cache, dpkg, sort,
+# grep) emit the untranslated strings these parsers expect.
+export LC_ALL=C
+#
 # Builds a fully self-contained development toolchain inside the workspace:
 #   .toolchain/rustup        RUSTUP_HOME
 #   .toolchain/cargo         CARGO_HOME  (cargo, rustc, rustfmt, clippy)
@@ -132,9 +143,24 @@ GDB16_MIN_MAJOR="${PRINCESSIDE_GDB16_MIN_MAJOR:-14}"
 # The suite 'trixie' (Debian testing) can also be specified as 'testing'.
 
 # rustup download endpoints.  static.rust-lang.org measured at ~62 B/s from this
-# host (unusable); the Tsinghua mirror measured at ~7 MB/s.  Override with
-# RUSTUP_DIST_SERVER / RUSTUP_UPDATE_ROOT in the environment to change this.
-: "${PRINCESSIDE_RUSTUP_DIST_SERVER:=https://mirrors.tuna.tsinghua.edu.cn/rustup}"
+# host (unusable).  Override with RUSTUP_DIST_SERVER / RUSTUP_UPDATE_ROOT in the
+# environment to change this.
+#
+# History, because this default has now broken twice:
+#   * mirrors.tuna.tsinghua.edu.cn/rustup started returning HTTP 403 for every
+#     URL under it (rustup-init and dist/channel-rust-stable.toml alike), which
+#     made this script die after three futile retries.
+#   * the campus joint mirror (校园网联合镜像站) serves the rust tree under
+#     /rustup -- NOT /rust-static, which 404s.
+#
+# Measured on this host 2026-09-13 by downloading the full 21 MB rustup-init:
+#   mirrors.cernet.edu.cn/rustup          5.7 s  (3.7 MB/s)   <-- selected
+#   mirrors.ustc.edu.cn/rust-static       7.2 s  (2.9 MB/s)
+#   mirrors.tuna.tsinghua.edu.cn/rustup   HTTP 403
+#
+# cernet redirects /rustup to cmcc.mirrors.ustc.edu.cn/rust-static/, so plain
+# USTC remains the fallback if the joint mirror is ever unreachable.
+: "${PRINCESSIDE_RUSTUP_DIST_SERVER:=https://mirrors.cernet.edu.cn/rustup}"
 RUSTUP_DIST_SERVER="$PRINCESSIDE_RUSTUP_DIST_SERVER"
 export RUSTUP_DIST_SERVER
 export RUSTUP_UPDATE_ROOT="${RUSTUP_UPDATE_ROOT:-$RUSTUP_DIST_SERVER/rustup}"
@@ -156,80 +182,122 @@ retry() {
   done
 }
 
-# Parallel download helper: downloads packages in parallel using xargs -P
+# Parallel download helper.
 # $1 = debs directory (where to download to)
 # $2 = apt options file (optional, for gdb16)
 # $3 = file containing package names (one per line)
 # $4 = log prefix (for error messages)
 # Returns 0 if all packages downloaded successfully, 1 if any failed
+#
+# Packages are handed to apt-get in BATCHES (PRINCESSIDE_DL_BATCH, default 32)
+# instead of one process per package.  apt's start-up cost is per process, not
+# per package: measured on this host, `apt-get download --print-uris` costs
+# ~0.33 s whether given one package name or eight, because it re-reads the
+# package lists either way.  The main toolchain resolves to ~240 packages, so
+# one-process-per-package burned ~80 s of pure start-up before any byte moved.
 download_parallel() {
   local debs_dir="$1"
   local apt_opts_file="$2"
   local pkg_list_file="$3"
   local log_prefix="$4"
-  
+
   if [ ! -s "$pkg_list_file" ]; then
     return 0
   fi
-  
+
   local pkg_count
   pkg_count=$(wc -l < "$pkg_list_file")
   local jobs="${PRINCESSIDE_DL_JOBS:-8}"
-  
-  log "$log_prefix: downloading $pkg_count package(s) with $jobs parallel jobs"
-  
-  # Create a temporary DIRECTORY to track failures.
-  # Each failing worker touches a file named after its package inside this
-  # directory (e.g.  $fail_dir/badpkg).  This is atomic (no concurrent-write
-  # corruption) and visible to the parent process because the directory path is
-  # passed as a positional argument — unlike a shell variable, a positional arg
-  # survives the xargs -> bash -c boundary.
+  local batch="${PRINCESSIDE_DL_BATCH:-32}"
+
+  # Create a temporary DIRECTORY to track failures.  Each failing package gets a
+  # file named after it inside this directory (e.g. $fail_dir/badpkg).  Touching
+  # a file is atomic (no concurrent-write corruption) and the directory is
+  # visible to the workers because its path is exported into the environment.
   local fail_dir
   fail_dir=$(mktemp -d)
-  
-  # The download function for each package.
-  # Positional args: $1=pkg $2=debs $3=opts_file $4=log_prefix $5=fail_dir
-  download_single_pkg() {
-    local pkg="$1"
-    local debs="$2"
-    local opts_file="$3"
-    local prefix="$4"
-    local fail_dir="$5"
-    
-    # Check if already cached (idempotency)
-    if [ -n "$(ls "$debs/${pkg}_"*.deb 2>/dev/null | head -n1 || true)" ]; then
-      return 0
+
+  # Drop everything already cached before spending an apt call on it.  This runs
+  # in the parent so a batch never contains packages that are already on disk.
+  local pending
+  pending=$(mktemp)
+  local pkg
+  while IFS= read -r pkg; do
+    [ -n "$pkg" ] || continue
+    if [ -n "$(ls "$debs_dir/${pkg}_"*.deb 2>/dev/null | head -n1 || true)" ]; then
+      continue
     fi
-    
-    # Build apt-get command
+    printf '%s\n' "$pkg"
+  done < "$pkg_list_file" > "$pending"
+
+  local todo
+  todo=$(wc -l < "$pending")
+  log "$log_prefix: $pkg_count package(s), $todo to fetch, $jobs parallel jobs, $batch per apt call"
+
+  if [ "$todo" -eq 0 ]; then
+    rm -f "$pending"
+    rm -rf "$fail_dir"
+    return 0
+  fi
+
+  # One apt process per batch.  The batch's package names arrive as positional
+  # args; the fixed paths travel through exported variables so they survive the
+  # xargs -> bash -c boundary (a shell variable would not).
+  download_batch() {
+    local -a pkgs=()
+    local p
+    for p in "$@"; do
+      [ -n "$p" ] || continue
+      # A concurrent batch may have fetched it already.
+      if [ -n "$(ls "$PRINCESSIDE_DL_DEBS/${p}_"*.deb 2>/dev/null | head -n1 || true)" ]; then
+        continue
+      fi
+      pkgs+=("$p")
+    done
+    [ "${#pkgs[@]}" -eq 0 ] && return 0
+
     local apt_cmd="apt-get"
-    if [ -n "$opts_file" ] && [ -f "$opts_file" ]; then
-      apt_cmd="apt-get $(cat "$opts_file")"
+    if [ -n "$PRINCESSIDE_DL_OPTS" ] && [ -f "$PRINCESSIDE_DL_OPTS" ]; then
+      apt_cmd="apt-get $(cat "$PRINCESSIDE_DL_OPTS")"
     fi
-    
-    # Download the package
-    if ( cd "$debs" && retry $apt_cmd download -q \
+
+    # Happy path: the whole batch in one apt invocation.
+    if ( cd "$PRINCESSIDE_DL_DEBS" && retry $apt_cmd download -q \
            -o APT::Sandbox::User=root \
-           --no-install-recommends "$pkg" >/dev/null 2>&1 ); then
+           --no-install-recommends "${pkgs[@]}" >/dev/null 2>&1 ); then
       return 0
-    else
-      warn "$prefix: could not download $pkg"
-      # Record failure: one file per package — atomic, no flock needed.
-      touch "$fail_dir/$pkg"
-      return 1
     fi
+
+    # The batch failed as a whole -- apt aborts the entire call when one name
+    # cannot be resolved.  Re-run it one package at a time so a single bad name
+    # neither hides the rest nor loses the ones that would have downloaded.
+    for p in "${pkgs[@]}"; do
+      if [ -n "$(ls "$PRINCESSIDE_DL_DEBS/${p}_"*.deb 2>/dev/null | head -n1 || true)" ]; then
+        continue
+      fi
+      if ( cd "$PRINCESSIDE_DL_DEBS" && retry $apt_cmd download -q \
+             -o APT::Sandbox::User=root \
+             --no-install-recommends "$p" >/dev/null 2>&1 ); then
+        continue
+      fi
+      warn "$PRINCESSIDE_DL_PREFIX: could not download $p"
+      # Record failure: one file per package -- atomic, no flock needed.
+      touch "$PRINCESSIDE_DL_FAIL/$p"
+    done
+    return 0
   }
-  
-  # Export functions for xargs workers (variables travel as positional args).
-  export -f download_single_pkg warn retry log
-  
-  # Run downloads in parallel.  $fail_dir is passed as the 5th positional arg
-  # so every worker can see it — a positional arg crosses the
-  # xargs -> bash -c boundary, whereas a shell variable does not.
-  cat "$pkg_list_file" | xargs -P "$jobs" -I {} bash -c \
-    'download_single_pkg "$@"' _ {} "$debs_dir" "$apt_opts_file" "$log_prefix" "$fail_dir" \
-    || true
-  
+
+  export PRINCESSIDE_DL_DEBS="$debs_dir"
+  export PRINCESSIDE_DL_OPTS="$apt_opts_file"
+  export PRINCESSIDE_DL_PREFIX="$log_prefix"
+  export PRINCESSIDE_DL_FAIL="$fail_dir"
+  export -f download_batch warn retry log
+
+  # -n $batch = packages per apt call, -P $jobs = batches in flight.
+  xargs -a "$pending" -n "$batch" -P "$jobs" bash -c 'download_batch "$@"' _ || true
+
+  rm -f "$pending"
+
   # Count failures: number of files in fail_dir = number of failed packages.
   local fail_count=0
   if [ -n "$(ls -A "$fail_dir" 2>/dev/null)" ]; then
@@ -240,9 +308,9 @@ download_parallel() {
       warn "  failed: $(basename "$f")"
     done
   fi
-  
+
   rm -rf "$fail_dir"
-  
+
   return $([ "$fail_count" -eq 0 ] && echo 0 || echo 1)
 }
 
@@ -512,10 +580,11 @@ install_gdb16() {
   if ! gdb16_index_usable; then
     log "gdb16: fetching $GDB16_SUITE package index from $GDB16_MIRROR"
     retry apt-get $(gdb16_apt_opts) update >/dev/null 2>&1 \
-      || die "gdb16: could not fetch the $GDB16_SUITE package index"
+      || { warn "gdb16: could not fetch the $GDB16_SUITE package index"; return 1; }
   fi
   if ! gdb16_index_usable; then
-    die "gdb16: '$GDB16_PKG' still has no candidate in $GDB16_SUITE after an index refresh"
+    warn "gdb16: '$GDB16_PKG' still has no candidate in $GDB16_SUITE after an index refresh"
+    return 1
   fi
   # Force the whole Packages file to be read once, up front.  apt writes the
   # index into its cache lazily and the `depends --recurse` walk below forks one
@@ -541,7 +610,7 @@ install_gdb16() {
     walk_a="$(do_gdb16_walk)"
     walk_b="$(do_gdb16_walk)"
     [ "$walk_a" = "$walk_b" ] \
-      || die "gdb16: dependency walk does not stabilise ($(printf '%s\n' "$walk_a" | wc -l) vs $(printf '%s\n' "$walk_b" | wc -l) packages)"
+      || { warn "gdb16: dependency walk does not stabilise ($(printf '%s\n' "$walk_a" | wc -l) vs $(printf '%s\n' "$walk_b" | wc -l) packages)"; return 1; }
   fi
 
   # --- resolve the recursive dependency closure ------------------------------
@@ -564,7 +633,8 @@ install_gdb16() {
   apt-cache $(gdb16_apt_opts) dump 2>/dev/null \
     | sed -n 's/^Package: //p' | sort -u >"$idx" || true
   if [ ! -s "$idx" ]; then
-    die "gdb16: could not enumerate the $GDB16_SUITE package index"
+    warn "gdb16: could not enumerate the $GDB16_SUITE package index"
+    return 1
   fi
 
   local closure=() p
@@ -621,7 +691,8 @@ install_gdb16() {
   fi
 
   if [ "${#closure[@]}" -eq 0 ]; then
-    die "gdb16: dependency resolution returned nothing"
+    warn "gdb16: dependency resolution returned nothing"
+    return 1
   fi
   log "gdb16: resolved ${#closure[@]} package(s) in the $GDB16_SUITE closure"
 
