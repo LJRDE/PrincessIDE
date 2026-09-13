@@ -114,7 +114,13 @@ fn run() -> i32 {
     let adapter = std::env::var("PRINCESSIDE_DEBUG_GDB").unwrap_or_else(|_| "princess-gdb".into());
     let qemu = std::env::var("PRINCESSIDE_QEMU_BIN")
         .unwrap_or_else(|_| "qemu-system-x86_64".to_string());
-    let qemu_data = std::env::var("PRINCESSIDE_QEMU_DATA").ok();
+    // `scripts/env.sh` exports this unconditionally, so on a machine whose QEMU
+    // data lives in a system prefix it points at a directory that is not there.
+    // Handing QEMU `-L <nonexistent>` is worse than passing nothing, so only a
+    // real directory is honoured (same rule as `Toolchain::discover`).
+    let qemu_data = std::env::var("PRINCESSIDE_QEMU_DATA")
+        .ok()
+        .filter(|dir| Path::new(dir).is_dir());
 
     let mut report = Report::new();
 

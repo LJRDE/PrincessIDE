@@ -727,7 +727,24 @@ mod tests {
         assert!(argv.contains("-display none"), "{argv}");
         assert!(argv.contains("-no-reboot"), "{argv}");
         assert!(argv.contains("-d int,cpu_reset,guest_errors"), "{argv}");
-        assert!(argv.contains("-L"), "{argv}");
+        // `-L` is emitted only when a QEMU data directory is actually known: the
+        // engine must not hand QEMU a path that is not there.  Which of the two
+        // holds depends on the machine (a workspace copy exists only after
+        // bootstrap extracted it, and a system QEMU keeps its data elsewhere), so
+        // assert the *rule* rather than one machine's layout.
+        match project.toolchain.qemu_data_dir() {
+            Some(data) => {
+                assert!(argv.contains("-L"), "{argv}");
+                assert!(
+                    argv.contains(data.to_string_lossy().as_ref()),
+                    "the known data dir must be the one passed to -L: {argv}"
+                );
+            }
+            None => assert!(
+                !argv.contains("-L"),
+                "no QEMU data dir is known, yet -L was emitted: {argv}"
+            ),
+        }
         assert_eq!(plan.timeout_ms, princess_core::DEFAULT_RUN_TIMEOUT_MS);
         assert_eq!(plan.serial.device, "com1");
         assert!(plan.serial.tee_to_file.as_deref().unwrap().ends_with("build/serial.log"));

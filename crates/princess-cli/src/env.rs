@@ -72,6 +72,15 @@ impl Toolchain {
     /// binary's source directory (so `--project /elsewhere` still finds the
     /// workspace toolchain), then the ambient environment.
     pub fn discover(project_root: &Path) -> Self {
+        Self::discover_with_qemu_hint(project_root, std::env::var_os("PRINCESSIDE_QEMU_DATA"))
+    }
+
+    /// [`Toolchain::discover`] with the QEMU data-dir hint injected.
+    ///
+    /// Exists so the "a hint that is not a directory is discarded" rule can be
+    /// tested without mutating the process environment: cargo runs tests in
+    /// threads, and another test in this module depends on the real hint.
+    pub(crate) fn discover_with_qemu_hint(project_root: &Path, qemu_hint: Option<OsString>) -> Self {
         let mut roots: Vec<PathBuf> = Vec::new();
         // Absolute start points: a relative `--project .` must not produce a
         // relative toolchain root, or every resolved tool path (and therefore
@@ -100,10 +109,16 @@ impl Toolchain {
 
         let mut path_parts: Vec<OsString> = Vec::new();
         let mut ld_parts: Vec<OsString> = Vec::new();
-        let mut qemu_data =
-            std::env::var_os("PRINCESSIDE_QEMU_DATA").map(|value| {
-                princess_core::config::absolute(&PathBuf::from(value))
-            });
+        // The env var is a *hint*, not an override of the field's "when it
+        // exists" rule.  `env.sh` exports the workspace path unconditionally, so
+        // on a machine whose QEMU data lives in a system prefix this variable
+        // points at a directory that is not there; taking it at face value made
+        // the engine hand QEMU `-L <nonexistent>` and made this module's own test
+        // fail on every layout without a workspace copy.  A non-directory hint is
+        // discarded, exactly as the workspace-prefix branch below already does.
+        let mut qemu_data = qemu_hint
+            .map(|value| princess_core::config::absolute(&PathBuf::from(value)))
+            .filter(|dir| dir.is_dir());
 
         if let Some(root) = &workspace_root {
             let toolchain = root.join(".toolchain");
@@ -331,8 +346,68 @@ mod tests {
     #[test]
     fn qemu_data_dir_resolves_inside_the_workspace() {
         let toolchain = Toolchain::discover(Path::new(env!("CARGO_MANIFEST_DIR")));
-        let data = toolchain.qemu_data_dir().expect("qemu data dir");
-        assert!(data.is_dir(), "{}", data.display());
-        assert!(data.starts_with(toolchain.workspace_root().unwrap()));
+        let root = toolchain.workspace_root().expect("workspace root");
+        match toolchain.qemu_data_dir() {
+            Some(data) => {
+                // Discovery only reports a directory that exists...
+                assert!(data.is_dir(), "{}", data.display());
+                // ...and it is either the workspace copy, or exactly the env
+                // hint.  A hint is an explicit override and may legitimately
+                // point outside the workspace (a system prefix, say), so the
+                // "inside the workspace" rule cannot be asserted unconditionally.
+                let hinted = std::env::var_os("PRINCESSIDE_QEMU_DATA")
+                    .map(|value| princess_core::config::absolute(&PathBuf::from(value)));
+                assert!(
+                    data.starts_with(&root) || hinted.as_deref() == Some(data),
+                    "{} is neither inside {} nor the PRINCESSIDE_QEMU_DATA hint",
+                    data.display(),
+                    root.display()
+                );
+            }
+            None => {
+                // No QEMU data dir anywhere: the invariant is that nothing was
+                // invented — and, with no usable hint, that the workspace copy
+                // really is absent.  (This is the normal case for a machine whose
+                // QEMU data lives in a system prefix; it used to panic here.)
+                let hint_usable = std::env::var_os("PRINCESSIDE_QEMU_DATA")
+                    .map(|value| princess_core::config::absolute(&PathBuf::from(value)).is_dir())
+                    .unwrap_or(false);
+                assert!(!hint_usable, "a usable hint was ignored");
+                assert!(
+                    !root.join(".toolchain/prefix/usr/share/qemu").is_dir(),
+                    "a workspace QEMU data dir exists but discovery did not report it"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_hint_that_is_not_a_directory_is_discarded() {
+        // Regression: `scripts/env.sh` exports PRINCESSIDE_QEMU_DATA
+        // unconditionally, so on a machine without a workspace QEMU data dir the
+        // hint points at nothing.  The engine used to trust it and hand QEMU
+        // `-L <nonexistent>`; discovery must drop such a hint instead.
+        let missing = std::env::temp_dir().join("princesside-definitely-not-a-qemu-data-dir");
+        let toolchain = Toolchain::discover_with_qemu_hint(
+            Path::new(env!("CARGO_MANIFEST_DIR")),
+            Some(missing.clone().into_os_string()),
+        );
+        assert_ne!(
+            toolchain.qemu_data_dir().map(Path::to_path_buf),
+            Some(missing),
+            "a nonexistent QEMU data hint was trusted"
+        );
+
+        // ...while a real directory hint is still honoured.
+        let existing = std::env::temp_dir();
+        let toolchain = Toolchain::discover_with_qemu_hint(
+            Path::new(env!("CARGO_MANIFEST_DIR")),
+            Some(existing.clone().into_os_string()),
+        );
+        assert_eq!(
+            toolchain.qemu_data_dir().map(Path::to_path_buf),
+            Some(existing),
+            "an existing QEMU data hint must be used as-is"
+        );
     }
 }
