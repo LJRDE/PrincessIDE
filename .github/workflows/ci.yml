@@ -28,7 +28,13 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Must be >= 22: jsdom@30 (used by the DOM tests through vitest)
+          # depends on undici@8, which calls Node's internal
+          # webidl.util.markAsUncloneable.  That API does not exist on Node 20,
+          # so every jsdom test file dies at import time with
+          # "TypeError: webidl.util.markAsUncloneable is not a function".
+          # Node 24 is what the frontend suite is verified against locally.
+          node-version: '24'
 
       - name: Install pnpm
         run: npm install -g pnpm
